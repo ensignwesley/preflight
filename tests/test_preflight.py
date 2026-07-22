@@ -2,7 +2,7 @@ import json
 import unittest
 from pathlib import Path
 
-from preflight.cli import latest_record, slug_time, write_record
+from preflight.cli import iter_records, latest_record, slug_time, write_record
 from preflight.probes import ProbeResult
 
 
@@ -30,7 +30,11 @@ class PreflightTests(unittest.TestCase):
             }
             path = write_record(record, tmp_path)
             self.assertEqual(latest_record(tmp_path), path)
+            self.assertEqual(iter_records(tmp_path), [path])
             self.assertEqual(json.loads(path.read_text())["checked_at"], record["checked_at"])
+
+    def test_iter_records_missing_dir_is_empty(self):
+        self.assertEqual(iter_records(Path("/tmp/preflight-missing-test-dir-should-not-exist")), [])
 
 
 if __name__ == "__main__":

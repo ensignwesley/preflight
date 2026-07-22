@@ -61,6 +61,12 @@ def latest_record(record_dir: Path) -> Path | None:
     return records[-1] if records else None
 
 
+def iter_records(record_dir: Path) -> list[Path]:
+    if not record_dir.exists():
+        return []
+    return sorted(record_dir.glob("*.json"))
+
+
 def cmd_record(args: argparse.Namespace) -> int:
     record = build_record(timeout=args.timeout)
     path = write_record(record, args.record_dir)
@@ -84,6 +90,27 @@ def cmd_last(args: argparse.Namespace) -> int:
     return 0 if record["status"] == "pass" else 1
 
 
+def cmd_list(args: argparse.Namespace) -> int:
+    records = iter_records(args.record_dir)
+    if args.json:
+        rows = []
+        for path in records:
+            record = json.loads(path.read_text(encoding="utf-8"))
+            rows.append({"path": str(path), "checked_at": record.get("checked_at"), "status": record.get("status")})
+        print(json.dumps(rows, indent=2, sort_keys=True))
+        return 0
+
+    if not records:
+        print(f"no records found in {args.record_dir}")
+        return 2
+
+    limit = max(1, args.limit)
+    for path in records[-limit:]:
+        record = json.loads(path.read_text(encoding="utf-8"))
+        print(f"{record.get('checked_at', 'unknown-time')} {record.get('status', 'unknown').upper()} {path}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="preflight", description="Fleet health recorder")
     parser.add_argument("--record-dir", type=Path, default=DEFAULT_RECORD_DIR)
@@ -103,6 +130,11 @@ def main(argv: list[str] | None = None) -> int:
     p_last = sub.add_parser("last", help="show the most recent record")
     p_last.add_argument("--json", action="store_true", help="print JSON instead of compact report")
     p_last.set_defaults(func=cmd_last)
+
+    p_list = sub.add_parser("list", help="list saved evidence records")
+    p_list.add_argument("--json", action="store_true", help="print JSON instead of compact report")
+    p_list.add_argument("--limit", type=int, default=10, help="maximum records to show")
+    p_list.set_defaults(func=cmd_list)
 
     args = parser.parse_args(argv)
     if getattr(args, "timeout", None) is None:

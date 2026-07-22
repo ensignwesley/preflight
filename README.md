@@ -15,8 +15,12 @@ preflight record
 preflight record --timeout 8
 preflight record --json
 preflight last
+preflight list
+preflight list --limit 20
 preflight check
 ```
+
+`check` currently uses the same recorder path as `record`; the product promise is still a saved evidence file, not an ephemeral ping. Use `list` and `last` to inspect what the recorder has captured.
 
 Records are written to:
 
