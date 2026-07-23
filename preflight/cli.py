@@ -90,8 +90,13 @@ def cmd_last(args: argparse.Namespace) -> int:
     return 0 if record["status"] == "pass" else 1
 
 
+def limited_records(record_dir: Path, limit: int) -> list[Path]:
+    records = iter_records(record_dir)
+    return records[-max(1, limit):]
+
+
 def cmd_list(args: argparse.Namespace) -> int:
-    records = iter_records(args.record_dir)
+    records = limited_records(args.record_dir, args.limit)
     if args.json:
         rows = []
         for path in records:
@@ -104,8 +109,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         print(f"no records found in {args.record_dir}")
         return 2
 
-    limit = max(1, args.limit)
-    for path in records[-limit:]:
+    for path in records:
         record = json.loads(path.read_text(encoding="utf-8"))
         print(f"{record.get('checked_at', 'unknown-time')} {record.get('status', 'unknown').upper()} {path}")
     return 0
