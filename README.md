@@ -4,7 +4,7 @@ A small read-only fleet health recorder for Wesley's services.
 
 ## Design
 
-`preflight record` is a black-box recorder snapshot, not a dashboard and not a daemon. It checks the public fleet, captures host context, writes durable JSON evidence, prints a compact operator report, and exits with an honest status code.
+`preflight record` is a black-box recorder snapshot, not a dashboard and not a daemon. It checks the public fleet, validates key health JSON fields, captures host context, writes durable JSON evidence, prints a compact operator report, and exits with an honest status code.
 
 This is the v0 product because the operator problem is evidence: when something looks wrong, produce a record that says what was checked, what passed, what failed or degraded, and what the host looked like at that moment.
 
@@ -35,14 +35,14 @@ Records are written to:
 - Status page
 - Status JSON data
 - Observatory page
-- Observatory JSON API
-- Dead Drop health
-- DEAD//CHAT health
-- Forth health
+- Observatory JSON API (`all_up: true`)
+- Dead Drop health (`ok`, service identity, readable/writable storage)
+- DEAD//CHAT health (`ok`, service identity)
+- Forth health (`ok`, service identity)
 - Lisp page
 - Markov page
 - Pathfinder page
-- Comments health
+- Comments health (`ok`, service identity, readable/writable storage)
 
 ## Host evidence captured
 

@@ -29,6 +29,32 @@ def run_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
     return ProbeResult(name=spec.get("name", "unknown"), kind=kind, status="fail", detail=f"unsupported probe kind: {kind}")
 
 
+def json_path(data: Any, path: str) -> Any:
+    """Return a dotted JSON path from nested dictionaries.
+
+    Preflight uses this for small semantic assertions on health endpoints. It is
+    intentionally simple: fleet probes only need object fields like ``ok`` or
+    ``storage.writable``, not a full JSONPath language.
+    """
+    value = data
+    for part in path.split("."):
+        if not isinstance(value, dict) or part not in value:
+            raise KeyError(path)
+        value = value[part]
+    return value
+
+
+def check_json_expectations(data: Any, expectations: dict[str, Any]) -> str | None:
+    for path, expected in expectations.items():
+        try:
+            actual = json_path(data, path)
+        except KeyError:
+            return f"missing JSON field: {path}"
+        if actual != expected:
+            return f"JSON field {path}={actual!r}, expected {expected!r}"
+    return None
+
+
 def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
     name = spec["name"]
     kind = spec.get("kind", "http")
@@ -45,9 +71,12 @@ def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
                 return ProbeResult(name, kind, "fail", url, code, elapsed_ms, f"HTTP {code}")
             if kind == "json":
                 try:
-                    json.loads(body or "null")
+                    payload = json.loads(body or "null")
                 except json.JSONDecodeError as exc:
                     return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, f"invalid JSON: {exc.msg}")
+                detail = check_json_expectations(payload, spec.get("expect_json", {}))
+                if detail:
+                    return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, detail)
             expected = spec.get("expect")
             if expected and expected not in body:
                 return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, f"missing marker: {expected!r}")

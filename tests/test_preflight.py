@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from preflight.cli import iter_records, latest_record, limited_records, slug_time, write_record
-from preflight.probes import ProbeResult
+from preflight.probes import ProbeResult, check_json_expectations, json_path
 
 
 class PreflightTests(unittest.TestCase):
@@ -13,6 +13,13 @@ class PreflightTests(unittest.TestCase):
     def test_probe_result_serializes(self):
         result = ProbeResult(name="x", kind="http", status="pass", url="https://example.test", http_status=200, elapsed_ms=12)
         self.assertEqual(result.to_dict()["status"], "pass")
+
+    def test_json_expectations_check_nested_fields(self):
+        payload = {"ok": True, "service": "demo", "storage": {"readable": True}}
+        self.assertEqual(json_path(payload, "storage.readable"), True)
+        self.assertIsNone(check_json_expectations(payload, {"ok": True, "storage.readable": True}))
+        self.assertEqual(check_json_expectations(payload, {"service": "other"}), "JSON field service='demo', expected 'other'")
+        self.assertEqual(check_json_expectations(payload, {"storage.writable": True}), "missing JSON field: storage.writable")
 
     def test_write_and_find_latest_record(self):
         import tempfile
