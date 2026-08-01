@@ -1,9 +1,10 @@
 import json
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from preflight.cli import iter_records, latest_record, limited_records, slug_time, write_record
-from preflight.probes import ProbeResult, check_json_expectations, json_path
+from preflight.probes import ProbeResult, check_json_expectations, check_json_freshness, json_path
 
 
 class PreflightTests(unittest.TestCase):
@@ -20,6 +21,18 @@ class PreflightTests(unittest.TestCase):
         self.assertIsNone(check_json_expectations(payload, {"ok": True, "storage.readable": True}))
         self.assertEqual(check_json_expectations(payload, {"service": "other"}), "JSON field service='demo', expected 'other'")
         self.assertEqual(check_json_expectations(payload, {"storage.writable": True}), "missing JSON field: storage.writable")
+
+    def test_json_freshness_flags_stale_status_data(self):
+        now = datetime(2026, 8, 1, 9, 0, tzinfo=timezone.utc)
+        fresh = {"generated_at": "2026-08-01T08:50:00+00:00"}
+        stale = {"generated_at": "2026-08-01T08:44:59+00:00"}
+        rule = {"field": "generated_at", "max_age_seconds": 900}
+        self.assertIsNone(check_json_freshness(fresh, rule, now=now))
+        self.assertEqual(
+            check_json_freshness(stale, rule, now=now),
+            "freshness field generated_at is stale (901s > 900s)",
+        )
+        self.assertEqual(check_json_freshness({}, rule, now=now), "missing freshness field: generated_at")
 
     def test_write_and_find_latest_record(self):
         import tempfile

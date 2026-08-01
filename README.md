@@ -33,7 +33,7 @@ Records are written to:
 - Blog home
 - Projects
 - Status page
-- Status JSON data
+- Status JSON data (`generated_at` must be no more than 15 minutes old)
 - Observatory page
 - Observatory JSON API (`all_up: true`)
 - Dead Drop health (`ok`, service identity, readable/writable storage)

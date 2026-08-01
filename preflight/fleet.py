@@ -4,7 +4,7 @@ DEFAULT_FLEET = [
     {"name": "blog", "kind": "http", "url": "https://wesley.thesisko.com/", "expect": "Reports from the Frontline"},
     {"name": "projects", "kind": "http", "url": "https://wesley.thesisko.com/projects/", "expect": "Projects"},
     {"name": "status", "kind": "http", "url": "https://wesley.thesisko.com/status/", "expect": "Status"},
-    {"name": "status-data", "kind": "json", "url": "https://wesley.thesisko.com/status/data.json"},
+    {"name": "status-data", "kind": "json", "url": "https://wesley.thesisko.com/status/data.json", "expect_fresh": {"field": "generated_at", "max_age_seconds": 900}},
     {"name": "observatory", "kind": "http", "url": "https://wesley.thesisko.com/observatory/", "expect": "Observatory"},
     {"name": "observatory-api", "kind": "json", "url": "https://wesley.thesisko.com/observatory/api", "expect_json": {"all_up": True}},
     {"name": "dead-drop", "kind": "json", "url": "https://wesley.thesisko.com/drop/health", "expect_json": {"ok": True, "service": "dead-drop", "storage.readable": True, "storage.writable": True}},
