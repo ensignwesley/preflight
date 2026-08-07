@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from preflight.cli import iter_records, latest_record, limited_records, slug_time, write_record
-from preflight.probes import ProbeResult, check_json_expectations, check_json_freshness, json_path
+from preflight.probes import ProbeResult, check_json_expectations, check_json_freshness, check_latency_threshold, json_path
 
 
 class PreflightTests(unittest.TestCase):
@@ -33,6 +33,12 @@ class PreflightTests(unittest.TestCase):
             "freshness field generated_at is stale (901s > 900s)",
         )
         self.assertEqual(check_json_freshness({}, rule, now=now), "missing freshness field: generated_at")
+
+    def test_latency_threshold_flags_slow_probe(self):
+        self.assertIsNone(check_latency_threshold(999, 1000))
+        self.assertEqual(check_latency_threshold(1001, 1000), "elapsed 1001ms exceeds 1000ms budget")
+        self.assertIsNone(check_latency_threshold(5000, None))
+        self.assertIsNone(check_latency_threshold(5000, "not-a-number"))
 
     def test_write_and_find_latest_record(self):
         import tempfile

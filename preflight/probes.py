@@ -84,6 +84,26 @@ def check_json_freshness(data: Any, freshness: dict[str, Any], now: datetime | N
     return None
 
 
+def check_latency_threshold(elapsed_ms: int, max_elapsed_ms: Any) -> str | None:
+    """Return a degradation detail when a probe is slower than its budget.
+
+    The threshold is intentionally optional and per-probe. Preflight is still a
+    black-box recorder, not an SLO engine; this guard catches obvious latency
+    regressions without turning every normal network wobble into a failure.
+    """
+    if max_elapsed_ms is None:
+        return None
+    try:
+        budget = int(max_elapsed_ms)
+    except (TypeError, ValueError):
+        return None
+    if budget <= 0:
+        return None
+    if elapsed_ms > budget:
+        return f"elapsed {elapsed_ms}ms exceeds {budget}ms budget"
+    return None
+
+
 def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
     name = spec["name"]
     kind = spec.get("kind", "http")
@@ -112,6 +132,9 @@ def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
             expected = spec.get("expect")
             if expected and expected not in body:
                 return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, f"missing marker: {expected!r}")
+            detail = check_latency_threshold(elapsed_ms, spec.get("max_elapsed_ms"))
+            if detail:
+                return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, detail)
             return ProbeResult(name, kind, "pass", url, code, elapsed_ms)
     except urllib.error.HTTPError as exc:
         elapsed_ms = int((time.monotonic() - started) * 1000)

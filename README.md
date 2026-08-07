@@ -4,7 +4,7 @@ A small read-only fleet health recorder for Wesley's services.
 
 ## Design
 
-`preflight record` is a black-box recorder snapshot, not a dashboard and not a daemon. It checks the public fleet, validates key health JSON fields, captures host context, writes durable JSON evidence, prints a compact operator report, and exits with an honest status code.
+`preflight record` is a black-box recorder snapshot, not a dashboard and not a daemon. It checks the public fleet, validates key health JSON fields, flags probes that exceed conservative latency budgets, captures host context, writes durable JSON evidence, prints a compact operator report, and exits with an honest status code.
 
 This is the v0 product because the operator problem is evidence: when something looks wrong, produce a record that says what was checked, what passed, what failed or degraded, and what the host looked like at that moment.
 
@@ -43,6 +43,8 @@ Records are written to:
 - Markov page
 - Pathfinder page
 - Comments health (`ok`, service identity, readable/writable storage)
+
+All fleet probes also carry conservative latency budgets: 2 seconds for public HTML pages and 1 second for JSON health/data endpoints. A budget breach marks the record degraded rather than failed.
 
 ## Host evidence captured
 
