@@ -17,6 +17,8 @@ class ProbeResult:
     url: str | None = None
     http_status: int | None = None
     elapsed_ms: int | None = None
+    content_type: str | None = None
+    body_bytes: int | None = None
     detail: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -104,6 +106,22 @@ def check_latency_threshold(elapsed_ms: int, max_elapsed_ms: Any) -> str | None:
     return None
 
 
+def check_content_type(content_type: str | None, expected: str | None) -> str | None:
+    """Return a degradation detail when a response media type drifts.
+
+    Only the media type is compared; charset and other parameters are ignored.
+    This keeps the check strict enough to catch HTML/error-page masquerades while
+    avoiding noise from harmless header parameters.
+    """
+    if not expected:
+        return None
+    actual = (content_type or "").split(";", 1)[0].strip().lower()
+    want = expected.split(";", 1)[0].strip().lower()
+    if actual != want:
+        return f"content-type {actual or 'missing'}, expected {want}"
+    return None
+
+
 def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
     name = spec["name"]
     kind = spec.get("kind", "http")
@@ -115,30 +133,36 @@ def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
             body_bytes = response.read(2_000_000)
             elapsed_ms = int((time.monotonic() - started) * 1000)
             code = response.getcode()
+            content_type = response.headers.get("content-type")
+            body_size = len(body_bytes)
             body = body_bytes.decode("utf-8", errors="replace")
             if not (200 <= code < 300):
-                return ProbeResult(name, kind, "fail", url, code, elapsed_ms, f"HTTP {code}")
+                return ProbeResult(name, kind, "fail", url, code, elapsed_ms, content_type, body_size, f"HTTP {code}")
+            expected_type = spec.get("expect_content_type") or ("application/json" if kind == "json" else None)
+            detail = check_content_type(content_type, expected_type)
+            if detail:
+                return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
             if kind == "json":
                 try:
                     payload = json.loads(body or "null")
                 except json.JSONDecodeError as exc:
-                    return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, f"invalid JSON: {exc.msg}")
+                    return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, f"invalid JSON: {exc.msg}")
                 detail = check_json_expectations(payload, spec.get("expect_json", {}))
                 if detail:
-                    return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, detail)
+                    return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
                 detail = check_json_freshness(payload, spec.get("expect_fresh", {}))
                 if detail:
-                    return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, detail)
+                    return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
             expected = spec.get("expect")
             if expected and expected not in body:
-                return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, f"missing marker: {expected!r}")
+                return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, f"missing marker: {expected!r}")
             detail = check_latency_threshold(elapsed_ms, spec.get("max_elapsed_ms"))
             if detail:
-                return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, detail)
-            return ProbeResult(name, kind, "pass", url, code, elapsed_ms)
+                return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
+            return ProbeResult(name, kind, "pass", url, code, elapsed_ms, content_type, body_size)
     except urllib.error.HTTPError as exc:
         elapsed_ms = int((time.monotonic() - started) * 1000)
-        return ProbeResult(name, kind, "fail", url, exc.code, elapsed_ms, f"HTTP {exc.code}")
+        return ProbeResult(name, kind, "fail", url, exc.code, elapsed_ms, exc.headers.get("content-type"), None, f"HTTP {exc.code}")
     except Exception as exc:  # network and timeout failures should be evidence, not stack traces
         elapsed_ms = int((time.monotonic() - started) * 1000)
-        return ProbeResult(name, kind, "fail", url, None, elapsed_ms, str(exc))
+        return ProbeResult(name, kind, "fail", url, None, elapsed_ms, None, None, str(exc))

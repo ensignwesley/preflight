@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from preflight.cli import iter_records, latest_record, limited_records, slug_time, write_record
-from preflight.probes import ProbeResult, check_json_expectations, check_json_freshness, check_latency_threshold, json_path
+from preflight.probes import ProbeResult, check_content_type, check_json_expectations, check_json_freshness, check_latency_threshold, json_path
 
 
 class PreflightTests(unittest.TestCase):
@@ -39,6 +39,12 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(check_latency_threshold(1001, 1000), "elapsed 1001ms exceeds 1000ms budget")
         self.assertIsNone(check_latency_threshold(5000, None))
         self.assertIsNone(check_latency_threshold(5000, "not-a-number"))
+
+    def test_content_type_check_ignores_parameters(self):
+        self.assertIsNone(check_content_type("application/json; charset=utf-8", "application/json"))
+        self.assertEqual(check_content_type("text/html", "application/json"), "content-type text/html, expected application/json")
+        self.assertEqual(check_content_type(None, "application/json"), "content-type missing, expected application/json")
+        self.assertIsNone(check_content_type("text/html", None))
 
     def test_write_and_find_latest_record(self):
         import tempfile
