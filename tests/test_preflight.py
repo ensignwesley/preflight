@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from preflight.cli import iter_records, latest_record, limited_records, slug_time, write_record
-from preflight.probes import ProbeResult, check_content_type, check_json_expectations, check_json_freshness, check_latency_threshold, json_path
+from preflight.probes import ProbeResult, check_content_type, check_json_array_names, check_json_expectations, check_json_freshness, check_latency_threshold, json_path
 
 
 class PreflightTests(unittest.TestCase):
@@ -33,6 +33,17 @@ class PreflightTests(unittest.TestCase):
             "freshness field generated_at is stale (901s > 900s)",
         )
         self.assertEqual(check_json_freshness({}, rule, now=now), "missing freshness field: generated_at")
+
+    def test_json_array_names_flags_roster_drift(self):
+        rule = {"field": "services", "names": ["Blog", "Dead Drop", "Status"]}
+        payload = {"services": [{"name": "Status"}, {"name": "Blog"}, {"name": "Dead Drop"}]}
+        self.assertIsNone(check_json_array_names(payload, rule))
+        self.assertEqual(
+            check_json_array_names({"services": [{"name": "Blog"}, {"name": "Status"}, {"name": "Ghost"}]}, rule),
+            "JSON array services names mismatch (missing Dead Drop; extra Ghost)",
+        )
+        self.assertEqual(check_json_array_names({}, rule), "missing JSON array: services")
+        self.assertEqual(check_json_array_names({"services": "Blog"}, rule), "JSON field services is not an array")
 
     def test_latency_threshold_flags_slow_probe(self):
         self.assertIsNone(check_latency_threshold(999, 1000))

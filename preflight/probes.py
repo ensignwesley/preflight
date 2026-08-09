@@ -58,6 +58,44 @@ def check_json_expectations(data: Any, expectations: dict[str, Any]) -> str | No
     return None
 
 
+def check_json_array_names(data: Any, rule: dict[str, Any]) -> str | None:
+    """Validate the exact names present in an array of JSON objects.
+
+    Status and inventory endpoints can drift while still returning plausible
+    JSON. This keeps Preflight from trusting a green ``all_up`` flag when the
+    underlying roster is missing, renamed, or quietly expanded without review.
+    """
+    field = rule.get("field")
+    expected = rule.get("names")
+    name_field = rule.get("name_field", "name")
+    if not field or expected is None:
+        return None
+    try:
+        raw_items = json_path(data, field)
+    except KeyError:
+        return f"missing JSON array: {field}"
+    if not isinstance(raw_items, list):
+        return f"JSON field {field} is not an array"
+    actual: list[str] = []
+    for index, item in enumerate(raw_items):
+        if not isinstance(item, dict):
+            return f"JSON field {field}[{index}] is not an object"
+        name = item.get(name_field)
+        if not isinstance(name, str):
+            return f"JSON field {field}[{index}].{name_field} is not a string"
+        actual.append(name)
+    if sorted(actual) != sorted(expected):
+        missing = sorted(set(expected) - set(actual))
+        extra = sorted(set(actual) - set(expected))
+        parts = []
+        if missing:
+            parts.append("missing " + ", ".join(missing))
+        if extra:
+            parts.append("extra " + ", ".join(extra))
+        return f"JSON array {field} names mismatch ({'; '.join(parts) or 'duplicate names'})"
+    return None
+
+
 def check_json_freshness(data: Any, freshness: dict[str, Any], now: datetime | None = None) -> str | None:
     """Validate that an ISO-8601 JSON timestamp is recent enough."""
     field = freshness.get("field")
@@ -151,6 +189,9 @@ def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
                 if detail:
                     return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
                 detail = check_json_freshness(payload, spec.get("expect_fresh", {}))
+                if detail:
+                    return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
+                detail = check_json_array_names(payload, spec.get("expect_array_names", {}))
                 if detail:
                     return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
             expected = spec.get("expect")
