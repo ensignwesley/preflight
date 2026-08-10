@@ -58,6 +58,16 @@ def check_json_expectations(data: Any, expectations: dict[str, Any]) -> str | No
     return None
 
 
+def check_body_markers(body: str, marker: str | None = None, markers: list[str] | None = None) -> str | None:
+    """Validate required human-visible markers in an HTTP response body."""
+    if marker and marker not in body:
+        return f"missing marker: {marker!r}"
+    for item in markers or []:
+        if item not in body:
+            return f"missing marker: {item!r}"
+    return None
+
+
 def check_json_array_names(data: Any, rule: dict[str, Any]) -> str | None:
     """Validate the exact names present in an array of JSON objects.
 
@@ -194,9 +204,9 @@ def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
                 detail = check_json_array_names(payload, spec.get("expect_array_names", {}))
                 if detail:
                     return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
-            expected = spec.get("expect")
-            if expected and expected not in body:
-                return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, f"missing marker: {expected!r}")
+            detail = check_body_markers(body, spec.get("expect"), spec.get("expect_all"))
+            if detail:
+                return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
             detail = check_latency_threshold(elapsed_ms, spec.get("max_elapsed_ms"))
             if detail:
                 return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)

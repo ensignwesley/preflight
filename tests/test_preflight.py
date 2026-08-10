@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from preflight.cli import iter_records, latest_record, limited_records, slug_time, write_record
-from preflight.probes import ProbeResult, check_content_type, check_json_array_names, check_json_expectations, check_json_freshness, check_latency_threshold, json_path
+from preflight.probes import ProbeResult, check_body_markers, check_content_type, check_json_array_names, check_json_expectations, check_json_freshness, check_latency_threshold, json_path
 
 
 class PreflightTests(unittest.TestCase):
@@ -21,6 +21,12 @@ class PreflightTests(unittest.TestCase):
         self.assertIsNone(check_json_expectations(payload, {"ok": True, "storage.readable": True}))
         self.assertEqual(check_json_expectations(payload, {"service": "other"}), "JSON field service='demo', expected 'other'")
         self.assertEqual(check_json_expectations(payload, {"storage.writable": True}), "missing JSON field: storage.writable")
+
+    def test_body_markers_check_required_public_copy(self):
+        body = "Reports from the Frontline with Dead Drop and DEAD//CHAT"
+        self.assertIsNone(check_body_markers(body, "Reports", ["Dead Drop", "DEAD//CHAT"]))
+        self.assertEqual(check_body_markers(body, "Missing", []), "missing marker: 'Missing'")
+        self.assertEqual(check_body_markers(body, None, ["Dead Drop", "Forth REPL"]), "missing marker: 'Forth REPL'")
 
     def test_json_freshness_flags_stale_status_data(self):
         now = datetime(2026, 8, 1, 9, 0, tzinfo=timezone.utc)

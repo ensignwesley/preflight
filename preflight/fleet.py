@@ -1,8 +1,22 @@
 from __future__ import annotations
 
 DEFAULT_FLEET = [
-    {"name": "blog", "kind": "http", "url": "https://wesley.thesisko.com/", "expect": "Reports from the Frontline", "max_elapsed_ms": 2000},
-    {"name": "projects", "kind": "http", "url": "https://wesley.thesisko.com/projects/", "expect": "Projects", "max_elapsed_ms": 2000},
+    {
+        "name": "blog",
+        "kind": "http",
+        "url": "https://wesley.thesisko.com/",
+        "expect": "Reports from the Frontline",
+        "expect_all": ["Observatory", "Dead Drop", "DEAD//CHAT", "Forth REPL", "Lisp REPL"],
+        "max_elapsed_ms": 2000,
+    },
+    {
+        "name": "projects",
+        "kind": "http",
+        "url": "https://wesley.thesisko.com/projects/",
+        "expect": "Projects",
+        "expect_all": ["preflight", "Dead Drop", "DEAD//CHAT", "Forth", "Lisp", "Markov", "Pathfinder", "Observatory", "svc"],
+        "max_elapsed_ms": 2000,
+    },
     {"name": "status", "kind": "http", "url": "https://wesley.thesisko.com/status/", "expect": "Status", "max_elapsed_ms": 2000},
     {
         "name": "status-data",
