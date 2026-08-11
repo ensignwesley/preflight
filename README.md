@@ -4,7 +4,7 @@ A small read-only fleet health recorder for Wesley's services.
 
 ## Design
 
-`preflight record` is a black-box recorder snapshot, not a dashboard and not a daemon. It checks the public fleet, validates key health JSON fields and exact service rosters where they matter, verifies JSON response media types, checks required human-visible page markers, records response content type/byte size, flags probes that exceed conservative latency budgets, captures host context, writes durable JSON evidence, prints a compact operator report, and exits with an honest status code.
+`preflight record` is a black-box recorder snapshot, not a dashboard and not a daemon. It checks the public fleet, validates key health JSON fields and exact service rosters where they matter, verifies JSON response media types, checks required security headers, checks required human-visible page markers, records response content type/byte size, flags probes that exceed conservative latency budgets, captures host context, writes durable JSON evidence, prints a compact operator report, and exits with an honest status code.
 
 This is the v0 product because the operator problem is evidence: when something looks wrong, produce a record that says what was checked, what passed, what failed or degraded, and what the host looked like at that moment.
 
@@ -36,15 +36,15 @@ Records are written to:
 - Status JSON data (`all_up: true`, exact ten-service roster, and `generated_at` no more than 15 minutes old)
 - Observatory page
 - Observatory JSON API (`all_up: true`)
-- Dead Drop health (`ok`, service identity, readable/writable storage)
+- Dead Drop health (`ok`, service identity, readable/writable storage, security headers)
 - DEAD//CHAT health (`ok`, service identity)
-- Forth health (`ok`, service identity)
+- Forth health (`ok`, service identity, security headers)
 - Lisp page
 - Markov page
 - Pathfinder page
-- Comments health (`ok`, service identity, readable/writable storage)
+- Comments health (`ok`, service identity, readable/writable storage, security headers)
 
-All JSON fleet probes must return `application/json` and every probe records its response content type and byte count. JSON media-type drift marks the record degraded before body parsing so HTML error pages cannot masquerade as healthy JSON. Status JSON also has to name the expected monitored services exactly, so a stale, truncated, or quietly changed roster cannot hide behind a green aggregate flag. Public HTML probes can require multiple page markers too; the home and Projects pages now prove that the visible fleet/project catalog still names the expected services instead of only matching one generic title. All fleet probes also carry conservative latency budgets: 2 seconds for public HTML pages and 1 second for JSON health/data endpoints. A budget breach marks the record degraded rather than failed.
+All JSON fleet probes must return `application/json` and every probe records its response content type and byte count. JSON media-type drift marks the record degraded before body parsing so HTML error pages cannot masquerade as healthy JSON. Status JSON also has to name the expected monitored services exactly, so a stale, truncated, or quietly changed roster cannot hide behind a green aggregate flag. Security-sensitive health endpoints also prove that required headers such as `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer` are still present. Public HTML probes can require multiple page markers too; the home and Projects pages now prove that the visible fleet/project catalog still names the expected services instead of only matching one generic title. All fleet probes also carry conservative latency budgets: 2 seconds for public HTML pages and 1 second for JSON health/data endpoints. A budget breach marks the record degraded rather than failed.
 
 ## Host evidence captured
 

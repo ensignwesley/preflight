@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from preflight.cli import iter_records, latest_record, limited_records, slug_time, write_record
-from preflight.probes import ProbeResult, check_body_markers, check_content_type, check_json_array_names, check_json_expectations, check_json_freshness, check_latency_threshold, json_path
+from preflight.probes import ProbeResult, check_body_markers, check_content_type, check_headers, check_json_array_names, check_json_expectations, check_json_freshness, check_latency_threshold, json_path
 
 
 class PreflightTests(unittest.TestCase):
@@ -62,6 +62,15 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(check_content_type("text/html", "application/json"), "content-type text/html, expected application/json")
         self.assertEqual(check_content_type(None, "application/json"), "content-type missing, expected application/json")
         self.assertIsNone(check_content_type("text/html", None))
+
+    def test_header_expectations_check_security_directives(self):
+        headers = {"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'self'; object-src 'none'"}
+        self.assertIsNone(check_headers(headers, {"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "object-src 'none'"}))
+        self.assertEqual(check_headers(headers, {"Referrer-Policy": "no-referrer"}), "missing header: Referrer-Policy")
+        self.assertEqual(
+            check_headers(headers, {"Content-Security-Policy": "frame-ancestors 'self'"}),
+            'header Content-Security-Policy="default-src \'self\'; object-src \'none\'", expected to contain "frame-ancestors \'self\'"',
+        )
 
     def test_write_and_find_latest_record(self):
         import tempfile

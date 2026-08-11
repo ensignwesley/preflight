@@ -170,6 +170,24 @@ def check_content_type(content_type: str | None, expected: str | None) -> str | 
     return None
 
 
+def check_headers(headers: Any, expectations: dict[str, str] | None) -> str | None:
+    """Validate required response headers.
+
+    Header checks are intentionally substring-based and case-insensitive for
+    names. Security headers often include long policies where the meaningful
+    regression is losing a directive, not harmless whitespace or directive order.
+    """
+    if not expectations:
+        return None
+    for name, expected in expectations.items():
+        actual = headers.get(name)
+        if actual is None:
+            return f"missing header: {name}"
+        if str(expected).lower() not in actual.lower():
+            return f"header {name}={actual!r}, expected to contain {expected!r}"
+    return None
+
+
 def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
     name = spec["name"]
     kind = spec.get("kind", "http")
@@ -188,6 +206,9 @@ def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
                 return ProbeResult(name, kind, "fail", url, code, elapsed_ms, content_type, body_size, f"HTTP {code}")
             expected_type = spec.get("expect_content_type") or ("application/json" if kind == "json" else None)
             detail = check_content_type(content_type, expected_type)
+            if detail:
+                return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
+            detail = check_headers(response.headers, spec.get("expect_headers"))
             if detail:
                 return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
             if kind == "json":
