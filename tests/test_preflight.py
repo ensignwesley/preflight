@@ -66,6 +66,7 @@ class PreflightTests(unittest.TestCase):
     def test_header_expectations_check_security_directives(self):
         headers = {"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'self'; object-src 'none'"}
         self.assertIsNone(check_headers(headers, {"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "object-src 'none'"}))
+        self.assertIsNone(check_headers(headers, {"x-content-type-options": "nosniff"}))
         self.assertEqual(check_headers(headers, {"Referrer-Policy": "no-referrer"}), "missing header: Referrer-Policy")
         self.assertEqual(
             check_headers(headers, {"Content-Security-Policy": "frame-ancestors 'self'"}),

@@ -179,11 +179,12 @@ def check_headers(headers: Any, expectations: dict[str, str] | None) -> str | No
     """
     if not expectations:
         return None
+    normalized = {str(key).lower(): value for key, value in headers.items()}
     for name, expected in expectations.items():
-        actual = headers.get(name)
+        actual = normalized.get(name.lower())
         if actual is None:
             return f"missing header: {name}"
-        if str(expected).lower() not in actual.lower():
+        if str(expected).lower() not in str(actual).lower():
             return f"header {name}={actual!r}, expected to contain {expected!r}"
     return None
 

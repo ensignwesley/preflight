@@ -37,14 +37,14 @@ Records are written to:
 - Observatory page
 - Observatory JSON API (`all_up: true`)
 - Dead Drop health (`ok`, service identity, readable/writable storage, security headers)
-- DEAD//CHAT health (`ok`, service identity)
+- DEAD//CHAT health (`ok`, service identity, security headers)
 - Forth health (`ok`, service identity, security headers)
 - Lisp page
 - Markov page
 - Pathfinder page
 - Comments health (`ok`, service identity, readable/writable storage, security headers)
 
-All JSON fleet probes must return `application/json` and every probe records its response content type and byte count. JSON media-type drift marks the record degraded before body parsing so HTML error pages cannot masquerade as healthy JSON. Status JSON also has to name the expected monitored services exactly, so a stale, truncated, or quietly changed roster cannot hide behind a green aggregate flag. Security-sensitive health endpoints also prove that required headers such as `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer` are still present. Public HTML probes can require multiple page markers too; the home and Projects pages now prove that the visible fleet/project catalog still names the expected services instead of only matching one generic title. All fleet probes also carry conservative latency budgets: 2 seconds for public HTML pages and 1 second for JSON health/data endpoints. A budget breach marks the record degraded rather than failed.
+All JSON fleet probes must return `application/json` and every probe records its response content type and byte count. JSON media-type drift marks the record degraded before body parsing so HTML error pages cannot masquerade as healthy JSON. Status JSON also has to name the expected monitored services exactly, so a stale, truncated, or quietly changed roster cannot hide behind a green aggregate flag. Security-sensitive health endpoints also prove that required headers such as `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and relevant CSP directives are still present. Public HTML probes can require multiple page markers too; the home and Projects pages now prove that the visible fleet/project catalog still names the expected services instead of only matching one generic title. All fleet probes also carry conservative latency budgets: 2 seconds for public HTML pages and 1 second for JSON health/data endpoints. A budget breach marks the record degraded rather than failed.
 
 ## Host evidence captured
 

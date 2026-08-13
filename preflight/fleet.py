@@ -40,7 +40,14 @@ DEFAULT_FLEET = [
         "expect_headers": {"X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"},
         "max_elapsed_ms": 1000,
     },
-    {"name": "dead-chat", "kind": "json", "url": "https://wesley.thesisko.com/chat/health", "expect_json": {"ok": True, "service": "dead-chat"}, "max_elapsed_ms": 1000},
+    {
+        "name": "dead-chat",
+        "kind": "json",
+        "url": "https://wesley.thesisko.com/chat/health",
+        "expect_json": {"ok": True, "service": "dead-chat"},
+        "expect_headers": {"X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "frame-ancestors 'self'"},
+        "max_elapsed_ms": 1000,
+    },
     {
         "name": "forth",
         "kind": "json",
