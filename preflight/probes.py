@@ -68,6 +68,19 @@ def check_body_markers(body: str, marker: str | None = None, markers: list[str] 
     return None
 
 
+def format_name_mismatch(expected: list[str], actual: list[str], subject: str) -> str | None:
+    if sorted(actual) == sorted(expected):
+        return None
+    missing = sorted(set(expected) - set(actual))
+    extra = sorted(set(actual) - set(expected))
+    parts = []
+    if missing:
+        parts.append("missing " + ", ".join(missing))
+    if extra:
+        parts.append("extra " + ", ".join(extra))
+    return f"{subject} names mismatch ({'; '.join(parts) or 'duplicate names'})"
+
+
 def check_json_array_names(data: Any, rule: dict[str, Any]) -> str | None:
     """Validate the exact names present in an array of JSON objects.
 
@@ -94,16 +107,28 @@ def check_json_array_names(data: Any, rule: dict[str, Any]) -> str | None:
         if not isinstance(name, str):
             return f"JSON field {field}[{index}].{name_field} is not a string"
         actual.append(name)
-    if sorted(actual) != sorted(expected):
-        missing = sorted(set(expected) - set(actual))
-        extra = sorted(set(actual) - set(expected))
-        parts = []
-        if missing:
-            parts.append("missing " + ", ".join(missing))
-        if extra:
-            parts.append("extra " + ", ".join(extra))
-        return f"JSON array {field} names mismatch ({'; '.join(parts) or 'duplicate names'})"
-    return None
+    return format_name_mismatch(expected, actual, f"JSON array {field}")
+
+
+def check_json_object_keys(data: Any, rule: dict[str, Any]) -> str | None:
+    """Validate the exact keys present in a JSON object.
+
+    Observatory exposes services as an object keyed by service slug rather than
+    as an array. This catches roster drift on those APIs without requiring a
+    separate one-off probe implementation.
+    """
+    field = rule.get("field")
+    expected = rule.get("keys")
+    if not field or expected is None:
+        return None
+    try:
+        raw_object = json_path(data, field)
+    except KeyError:
+        return f"missing JSON object: {field}"
+    if not isinstance(raw_object, dict):
+        return f"JSON field {field} is not an object"
+    actual = [str(key) for key in raw_object.keys()]
+    return format_name_mismatch(expected, actual, f"JSON object {field}")
 
 
 def check_json_freshness(data: Any, freshness: dict[str, Any], now: datetime | None = None) -> str | None:
@@ -224,6 +249,9 @@ def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
                 if detail:
                     return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
                 detail = check_json_array_names(payload, spec.get("expect_array_names", {}))
+                if detail:
+                    return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
+                detail = check_json_object_keys(payload, spec.get("expect_object_keys", {}))
                 if detail:
                     return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
             detail = check_body_markers(body, spec.get("expect"), spec.get("expect_all"))

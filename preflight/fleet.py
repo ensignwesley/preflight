@@ -31,7 +31,18 @@ DEFAULT_FLEET = [
         "max_elapsed_ms": 1000,
     },
     {"name": "observatory", "kind": "http", "url": "https://wesley.thesisko.com/observatory/", "expect": "Observatory", "max_elapsed_ms": 2000},
-    {"name": "observatory-api", "kind": "json", "url": "https://wesley.thesisko.com/observatory/api", "expect_json": {"all_up": True}, "max_elapsed_ms": 1000},
+    {
+        "name": "observatory-api",
+        "kind": "json",
+        "url": "https://wesley.thesisko.com/observatory/api",
+        "expect_json": {"all_up": True},
+        "expect_fresh": {"field": "generated_at", "max_age_seconds": 900},
+        "expect_object_keys": {
+            "field": "services",
+            "keys": ["blog", "dead-drop", "dead-chat", "status", "observatory", "pathfinder", "comments", "forth", "lisp", "markov"],
+        },
+        "max_elapsed_ms": 1000,
+    },
     {
         "name": "dead-drop",
         "kind": "json",
