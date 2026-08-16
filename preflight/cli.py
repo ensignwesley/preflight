@@ -39,8 +39,21 @@ def write_record(record: dict[str, Any], record_dir: Path) -> Path:
     return path
 
 
+def status_counts(record: dict[str, Any]) -> dict[str, int]:
+    counts = {"pass": 0, "degraded": 0, "fail": 0}
+    for probe in record.get("probes", []):
+        status = probe.get("status")
+        if status in counts:
+            counts[status] += 1
+    return counts
+
+
+def format_status_counts(counts: dict[str, int]) -> str:
+    return f"{counts['pass']} pass, {counts['degraded']} degraded, {counts['fail']} fail"
+
+
 def print_report(record: dict[str, Any], path: Path | None = None) -> None:
-    print(f"preflight {record['status'].upper()} {record['checked_at']}")
+    print(f"preflight {record['status'].upper()} {record['checked_at']} ({format_status_counts(status_counts(record))})")
     for probe in record["probes"]:
         elapsed = f"{probe['elapsed_ms']}ms" if probe.get("elapsed_ms") is not None else "n/a"
         detail = f" — {probe['detail']}" if probe.get("detail") else ""

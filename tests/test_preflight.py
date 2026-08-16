@@ -3,13 +3,19 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-from preflight.cli import iter_records, latest_record, limited_records, slug_time, write_record
+from preflight.cli import format_status_counts, iter_records, latest_record, limited_records, slug_time, status_counts, write_record
 from preflight.probes import ProbeResult, check_body_markers, check_content_type, check_headers, check_json_array_names, check_json_expectations, check_json_freshness, check_json_object_keys, check_latency_threshold, json_path
 
 
 class PreflightTests(unittest.TestCase):
     def test_slug_time_is_filename_safe(self):
         self.assertEqual(slug_time("2026-07-22T04:20:00Z"), "20260722T042000Z")
+
+    def test_status_counts_summarize_probe_outcomes(self):
+        record = {"probes": [{"status": "pass"}, {"status": "degraded"}, {"status": "fail"}, {"status": "pass"}]}
+        counts = status_counts(record)
+        self.assertEqual(counts, {"pass": 2, "degraded": 1, "fail": 1})
+        self.assertEqual(format_status_counts(counts), "2 pass, 1 degraded, 1 fail")
 
     def test_probe_result_serializes(self):
         result = ProbeResult(name="x", kind="http", status="pass", url="https://example.test", http_status=200, elapsed_ms=12)

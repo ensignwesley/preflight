@@ -20,7 +20,7 @@ preflight list --limit 20
 preflight check
 ```
 
-`check` currently uses the same recorder path as `record`; the product promise is still a saved evidence file, not an ephemeral ping. Use `list` and `last` to inspect what the recorder has captured. `list --json` emits the same latest-record window as text output, honoring `--limit` for scripts.
+`check` currently uses the same recorder path as `record`; the product promise is still a saved evidence file, not an ephemeral ping. Use `list` and `last` to inspect what the recorder has captured. Compact reports include pass/degraded/fail probe counts in the header so an operator can see severity at a glance before reading individual probe lines. `list --json` emits the same latest-record window as text output, honoring `--limit` for scripts.
 
 Records are written to:
 
