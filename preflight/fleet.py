@@ -78,4 +78,19 @@ DEFAULT_FLEET = [
         "expect_headers": {"X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"},
         "max_elapsed_ms": 1000,
     },
+    {
+        "name": "promotion-review",
+        "kind": "http",
+        "url": "https://wesley.thesisko.com/promotion-review/",
+        "expect": "Promotion Review Portal",
+        "expect_all": ["Phase 1", "Secure Coms", "Evaluation details"],
+        "max_elapsed_ms": 2000,
+    },
+    {
+        "name": "promotion-review-status",
+        "kind": "json",
+        "url": "https://wesley.thesisko.com/promotion-review/api/status",
+        "expect_json": {"status": "phase1", "service": "promotion-review", "evaluation.max_score": 50},
+        "max_elapsed_ms": 1000,
+    },
 ]

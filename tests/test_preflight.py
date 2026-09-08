@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from preflight.cli import format_status_counts, iter_records, latest_record, limited_records, slug_time, status_counts, write_record
+from preflight.fleet import DEFAULT_FLEET
 from preflight.probes import ProbeResult, check_body_markers, check_content_type, check_headers, check_json_array_names, check_json_expectations, check_json_freshness, check_json_object_keys, check_latency_threshold, json_path
 
 
@@ -20,6 +21,13 @@ class PreflightTests(unittest.TestCase):
     def test_probe_result_serializes(self):
         result = ProbeResult(name="x", kind="http", status="pass", url="https://example.test", http_status=200, elapsed_ms=12)
         self.assertEqual(result.to_dict()["status"], "pass")
+
+    def test_default_fleet_includes_promotion_review_surface_and_status_api(self):
+        by_name = {spec["name"]: spec for spec in DEFAULT_FLEET}
+        self.assertIn("promotion-review", by_name)
+        self.assertIn("promotion-review-status", by_name)
+        self.assertEqual(by_name["promotion-review"]["url"], "https://wesley.thesisko.com/promotion-review/")
+        self.assertEqual(by_name["promotion-review-status"]["expect_json"]["service"], "promotion-review")
 
     def test_json_expectations_check_nested_fields(self):
         payload = {"ok": True, "service": "demo", "storage": {"readable": True}}
