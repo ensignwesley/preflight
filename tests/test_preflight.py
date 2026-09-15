@@ -22,6 +22,16 @@ class PreflightTests(unittest.TestCase):
         result = ProbeResult(name="x", kind="http", status="pass", url="https://example.test", http_status=200, elapsed_ms=12)
         self.assertEqual(result.to_dict()["status"], "pass")
 
+    def test_default_fleet_includes_public_app_surfaces(self):
+        by_name = {spec["name"]: spec for spec in DEFAULT_FLEET}
+        for name in ["dead-drop-ui", "dead-chat-ui", "comments-ui", "promotion-review"]:
+            self.assertIn(name, by_name)
+            self.assertEqual(by_name[name]["kind"], "http")
+        self.assertIn("Secret Message", by_name["dead-drop-ui"]["expect_all"])
+        self.assertIn("Callsign", by_name["dead-chat-ui"]["expect_all"])
+        self.assertEqual(by_name["comments-ui"]["request_headers"], {"Accept": "text/html"})
+        self.assertIn("Public endpoints", by_name["comments-ui"]["expect_all"])
+
     def test_default_fleet_includes_promotion_review_surface_and_status_api(self):
         by_name = {spec["name"]: spec for spec in DEFAULT_FLEET}
         self.assertIn("promotion-review", by_name)

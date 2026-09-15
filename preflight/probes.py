@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import time
 import urllib.error
@@ -219,7 +220,9 @@ def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
     kind = spec.get("kind", "http")
     url = spec["url"]
     started = time.monotonic()
-    request = urllib.request.Request(url, headers={"User-Agent": "preflight/0.1"})
+    request_headers = {"User-Agent": "preflight/0.1"}
+    request_headers.update({str(key): str(value) for key, value in spec.get("request_headers", {}).items()})
+    request = urllib.request.Request(url, headers=request_headers)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             body_bytes = response.read(2_000_000)
@@ -227,7 +230,7 @@ def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
             code = response.getcode()
             content_type = response.headers.get("content-type")
             body_size = len(body_bytes)
-            body = body_bytes.decode("utf-8", errors="replace")
+            body = html.unescape(body_bytes.decode("utf-8", errors="replace"))
             if not (200 <= code < 300):
                 return ProbeResult(name, kind, "fail", url, code, elapsed_ms, content_type, body_size, f"HTTP {code}")
             expected_type = spec.get("expect_content_type") or ("application/json" if kind == "json" else None)
