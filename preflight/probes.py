@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import html
 import json
+import base64
+import os
+import socket
+import ssl
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
@@ -30,7 +35,68 @@ def run_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
     kind = spec.get("kind", "http")
     if kind in {"http", "json"}:
         return http_probe(spec, timeout=timeout)
+    if kind == "websocket":
+        return websocket_probe(spec, timeout=timeout)
     return ProbeResult(name=spec.get("name", "unknown"), kind=kind, status="fail", detail=f"unsupported probe kind: {kind}")
+
+
+def websocket_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
+    """Validate that a public WebSocket endpoint performs an RFC 6455 upgrade.
+
+    HTTP health routes can stay green while the reverse-proxied upgrade path is
+    broken. This probe keeps Preflight honest for browser apps whose real
+    behavior depends on WebSockets.
+    """
+    name = spec["name"]
+    url = spec["url"]
+    parsed = urllib.parse.urlparse(url)
+    scheme = parsed.scheme.lower()
+    if scheme not in {"ws", "wss"}:
+        return ProbeResult(name, "websocket", "fail", url, detail=f"unsupported websocket scheme: {parsed.scheme}")
+    host = parsed.hostname
+    if not host:
+        return ProbeResult(name, "websocket", "fail", url, detail="missing websocket host")
+    port = parsed.port or (443 if scheme == "wss" else 80)
+    path = parsed.path or "/"
+    if parsed.query:
+        path += "?" + parsed.query
+    started = time.monotonic()
+    key = base64.b64encode(os.urandom(16)).decode("ascii")
+    headers = {
+        "Host": host if parsed.port is None else f"{host}:{port}",
+        "Upgrade": "websocket",
+        "Connection": "Upgrade",
+        "Sec-WebSocket-Key": key,
+        "Sec-WebSocket-Version": "13",
+        "User-Agent": "preflight/0.1",
+    }
+    headers.update({str(k): str(v) for k, v in spec.get("request_headers", {}).items()})
+    request = f"GET {path} HTTP/1.1\r\n" + "".join(f"{k}: {v}\r\n" for k, v in headers.items()) + "\r\n"
+    sock: socket.socket | ssl.SSLSocket | None = None
+    try:
+        raw = socket.create_connection((host, port), timeout=timeout)
+        sock = ssl.create_default_context().wrap_socket(raw, server_hostname=host) if scheme == "wss" else raw
+        sock.settimeout(timeout)
+        sock.sendall(request.encode("ascii"))
+        response = sock.recv(4096).decode("latin1", errors="replace")
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+        status_line = response.split("\r\n", 1)[0]
+        header_block = response.split("\r\n\r\n", 1)[0]
+        lower_headers = header_block.lower()
+        if not status_line.startswith("HTTP/1.1 101") and not status_line.startswith("HTTP/1.0 101"):
+            return ProbeResult(name, "websocket", "fail", url, None, elapsed_ms, None, len(response), f"upgrade failed: {status_line or 'no response'}")
+        if "upgrade: websocket" not in lower_headers:
+            return ProbeResult(name, "websocket", "degraded", url, 101, elapsed_ms, None, len(response), "missing Upgrade: websocket header")
+        detail = check_latency_threshold(elapsed_ms, spec.get("max_elapsed_ms"))
+        if detail:
+            return ProbeResult(name, "websocket", "degraded", url, 101, elapsed_ms, None, len(response), detail)
+        return ProbeResult(name, "websocket", "pass", url, 101, elapsed_ms, None, len(response))
+    except Exception as exc:
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+        return ProbeResult(name, "websocket", "fail", url, None, elapsed_ms, None, None, str(exc))
+    finally:
+        if sock is not None:
+            sock.close()
 
 
 def json_path(data: Any, path: str) -> Any:

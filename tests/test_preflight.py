@@ -5,7 +5,7 @@ from pathlib import Path
 
 from preflight.cli import format_status_counts, iter_records, latest_record, limited_records, slug_time, status_counts, write_record
 from preflight.fleet import DEFAULT_FLEET
-from preflight.probes import ProbeResult, check_body_markers, check_content_type, check_headers, check_json_array_names, check_json_expectations, check_json_freshness, check_json_object_keys, check_latency_threshold, json_path
+from preflight.probes import ProbeResult, check_body_markers, check_content_type, check_headers, check_json_array_names, check_json_expectations, check_json_freshness, check_json_object_keys, check_latency_threshold, json_path, run_probe
 
 
 class PreflightTests(unittest.TestCase):
@@ -29,6 +29,9 @@ class PreflightTests(unittest.TestCase):
             self.assertEqual(by_name[name]["kind"], "http")
         self.assertIn("Secret Message", by_name["dead-drop-ui"]["expect_all"])
         self.assertIn("Callsign", by_name["dead-chat-ui"]["expect_all"])
+        self.assertEqual(by_name["dead-chat-ws"]["kind"], "websocket")
+        self.assertEqual(by_name["dead-chat-ws"]["url"], "wss://wesley.thesisko.com/chat/ws")
+        self.assertEqual(by_name["forth-ws"]["kind"], "websocket")
         self.assertEqual(by_name["comments-ui"]["request_headers"], {"Accept": "text/html"})
         self.assertIn("Public endpoints", by_name["comments-ui"]["expect_all"])
 
@@ -38,6 +41,11 @@ class PreflightTests(unittest.TestCase):
         self.assertIn("promotion-review-status", by_name)
         self.assertEqual(by_name["promotion-review"]["url"], "https://wesley.thesisko.com/promotion-review/")
         self.assertEqual(by_name["promotion-review-status"]["expect_json"]["service"], "promotion-review")
+
+    def test_websocket_probe_rejects_non_websocket_scheme(self):
+        result = run_probe({"name": "bad-ws", "kind": "websocket", "url": "https://example.test/ws"})
+        self.assertEqual(result.status, "fail")
+        self.assertEqual(result.detail, "unsupported websocket scheme: https")
 
     def test_json_expectations_check_nested_fields(self):
         payload = {"ok": True, "service": "demo", "storage": {"readable": True}}

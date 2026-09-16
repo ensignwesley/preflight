@@ -76,11 +76,23 @@ DEFAULT_FLEET = [
         "max_elapsed_ms": 1000,
     },
     {
+        "name": "dead-chat-ws",
+        "kind": "websocket",
+        "url": "wss://wesley.thesisko.com/chat/ws",
+        "max_elapsed_ms": 1000,
+    },
+    {
         "name": "forth",
         "kind": "json",
         "url": "https://wesley.thesisko.com/forth/health",
         "expect_json": {"ok": True, "service": "forth"},
         "expect_headers": {"X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"},
+        "max_elapsed_ms": 1000,
+    },
+    {
+        "name": "forth-ws",
+        "kind": "websocket",
+        "url": "wss://wesley.thesisko.com/forth/ws",
         "max_elapsed_ms": 1000,
     },
     {"name": "lisp", "kind": "http", "url": "https://wesley.thesisko.com/lisp/", "expect": "Lisp", "max_elapsed_ms": 2000},
