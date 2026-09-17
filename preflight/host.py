@@ -63,11 +63,23 @@ def top_processes(limit: int = 8) -> list[dict[str, Any]]:
     return rows
 
 
+def reboot_required(path: str = "/var/run/reboot-required") -> bool:
+    """Return whether the host is advertising a pending reboot.
+
+    This is a small but important maintenance signal: a fleet check can be fully
+    green while the host still needs a planned reboot for updated packages.
+    Capturing it in every record keeps that risk visible instead of relying on a
+    separate manual note.
+    """
+    return Path(path).exists()
+
+
 def capture_host() -> dict[str, Any]:
     return {
         "hostname": os.uname().nodename,
         "load": loadavg(),
         "memory": memory(),
         "disks": disks(),
+        "reboot_required": reboot_required(),
         "top_processes": top_processes(),
     }

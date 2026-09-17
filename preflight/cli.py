@@ -63,6 +63,8 @@ def print_report(record: dict[str, Any], path: Path | None = None) -> None:
     print(f"host load={host['load']['load_1']:.2f}/{host['load']['load_5']:.2f}/{host['load']['load_15']:.2f} mem_used={mem['used_kb']//1024}MB/{mem['total_kb']//1024}MB")
     for disk in host["disks"]:
         print(f"disk {disk['mount']} used={disk['used_pct']}% free={disk['free_bytes']//(1024*1024)}MB")
+    if "reboot_required" in host:
+        print(f"reboot_required={'yes' if host['reboot_required'] else 'no'}")
     if path:
         print(f"record: {path}")
 

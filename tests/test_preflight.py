@@ -3,8 +3,9 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-from preflight.cli import format_status_counts, iter_records, latest_record, limited_records, slug_time, status_counts, write_record
+from preflight.cli import build_record, format_status_counts, iter_records, latest_record, limited_records, slug_time, status_counts, write_record
 from preflight.fleet import DEFAULT_FLEET
+from preflight.host import reboot_required
 from preflight.probes import ProbeResult, check_body_markers, check_content_type, check_headers, check_json_array_names, check_json_expectations, check_json_freshness, check_json_object_keys, check_latency_threshold, json_path, run_probe
 
 
@@ -115,6 +116,19 @@ class PreflightTests(unittest.TestCase):
             check_headers(headers, {"Content-Security-Policy": "frame-ancestors 'self'"}),
             'header Content-Security-Policy="default-src \'self\'; object-src \'none\'", expected to contain "frame-ancestors \'self\'"',
         )
+
+    def test_reboot_required_reports_marker_file_presence(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / "reboot-required"
+            self.assertFalse(reboot_required(str(marker)))
+            marker.write_text("restart required\n", encoding="utf-8")
+            self.assertTrue(reboot_required(str(marker)))
+
+    def test_record_includes_reboot_required_signal(self):
+        record = build_record(timeout=0.001)
+        self.assertIn("reboot_required", record["host"])
+        self.assertIsInstance(record["host"]["reboot_required"], bool)
 
     def test_write_and_find_latest_record(self):
         import tempfile
