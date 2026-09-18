@@ -54,6 +54,7 @@ All JSON fleet probes must return `application/json` and every HTTP probe record
 - Load average
 - Memory totals/available/used
 - Disk usage for `/` and `/home`
+- Reboot-required marker presence (`/var/run/reboot-required`), so repeated maintenance warnings are captured as structured evidence instead of operator memory
 - Top processes by CPU via `ps`
 
 ## Exit codes
