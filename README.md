@@ -33,7 +33,7 @@ Records are written to:
 - Blog home
 - Projects
 - Status page
-- Status JSON data (`all_up: true`, exact ten-service roster, and `generated_at` no more than 15 minutes old)
+- Status JSON data (`all_up: true`, exact eleven-service roster, and `generated_at` no more than 15 minutes old)
 - Observatory page
 - Observatory JSON API (`all_up: true`, exact service-key roster, and `generated_at` no more than 15 minutes old)
 - Dead Drop public app page (`DEAD DROP`, message box, auto-destruct control, encryption CTA) and health (`ok`, service identity, readable/writable storage, security headers)

@@ -26,7 +26,7 @@ DEFAULT_FLEET = [
         "expect_fresh": {"field": "generated_at", "max_age_seconds": 900},
         "expect_array_names": {
             "field": "services",
-            "names": ["Blog", "Dead Drop", "DEAD//CHAT", "Status", "Observatory", "Pathfinder", "Comments", "Forth REPL", "Lisp REPL", "Markov REPL"],
+            "names": ["Blog", "Dead Drop", "DEAD//CHAT", "Status", "Observatory", "Pathfinder", "Comments", "Forth REPL", "Lisp REPL", "Markov REPL", "Promotion Review"],
         },
         "max_elapsed_ms": 1000,
     },
@@ -39,7 +39,7 @@ DEFAULT_FLEET = [
         "expect_fresh": {"field": "generated_at", "max_age_seconds": 900},
         "expect_object_keys": {
             "field": "services",
-            "keys": ["blog", "dead-drop", "dead-chat", "status", "observatory", "pathfinder", "comments", "forth", "lisp", "markov"],
+            "keys": ["blog", "dead-drop", "dead-chat", "status", "observatory", "pathfinder", "comments", "forth", "lisp", "markov", "promotion-review"],
         },
         "max_elapsed_ms": 1000,
     },
