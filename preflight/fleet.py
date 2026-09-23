@@ -14,7 +14,7 @@ DEFAULT_FLEET = [
         "kind": "http",
         "url": "https://wesley.thesisko.com/projects/",
         "expect": "Projects",
-        "expect_all": ["preflight", "Dead Drop", "DEAD//CHAT", "Forth", "Lisp", "Markov", "Pathfinder", "Observatory", "svc"],
+        "expect_all": ["preflight", "Dead Drop", "DEAD//CHAT", "Forth", "Lisp", "Markov", "Pathfinder", "Observatory", "Command News Feed", "svc"],
         "max_elapsed_ms": 2000,
     },
     {"name": "status", "kind": "http", "url": "https://wesley.thesisko.com/status/", "expect": "Status", "max_elapsed_ms": 2000},
@@ -26,7 +26,7 @@ DEFAULT_FLEET = [
         "expect_fresh": {"field": "generated_at", "max_age_seconds": 900},
         "expect_array_names": {
             "field": "services",
-            "names": ["Blog", "Dead Drop", "DEAD//CHAT", "Status", "Observatory", "Pathfinder", "Comments", "Forth REPL", "Lisp REPL", "Markov REPL", "Promotion Review"],
+            "names": ["Blog", "Dead Drop", "DEAD//CHAT", "Status", "Observatory", "Pathfinder", "Comments", "Forth REPL", "Lisp REPL", "Markov REPL", "Promotion Review", "Command News Feed"],
         },
         "max_elapsed_ms": 1000,
     },
@@ -39,7 +39,7 @@ DEFAULT_FLEET = [
         "expect_fresh": {"field": "generated_at", "max_age_seconds": 900},
         "expect_object_keys": {
             "field": "services",
-            "keys": ["blog", "dead-drop", "dead-chat", "status", "observatory", "pathfinder", "comments", "forth", "lisp", "markov", "promotion-review"],
+            "keys": ["blog", "dead-drop", "dead-chat", "status", "observatory", "pathfinder", "comments", "forth", "lisp", "markov", "promotion-review", "command-news"],
         },
         "max_elapsed_ms": 1000,
     },
@@ -130,6 +130,36 @@ DEFAULT_FLEET = [
         "kind": "json",
         "url": "https://wesley.thesisko.com/promotion-review/api/status",
         "expect_json": {"status": "phase1", "service": "promotion-review", "evaluation.max_score": 50},
+        "max_elapsed_ms": 1000,
+    },
+    {
+        "name": "command-news-feed",
+        "kind": "json",
+        "url": "https://wesley.thesisko.com/command-news/feed.json",
+        "expect_array_item_keys": {
+            "keys": ["title", "url", "source", "publishedAt", "fetchedAt"],
+            "min_items": 1,
+        },
+        "max_elapsed_ms": 1000,
+    },
+    {
+        "name": "command-news-status",
+        "kind": "json",
+        "url": "https://wesley.thesisko.com/command-news/status.json",
+        "expect_json": {"healthy": True},
+        "expect_fresh": {"field": "generatedAt", "max_age_seconds": 18000},
+        "expect_object_keys": {
+            "field": "sources",
+            "keys": ["Hacker News", "Ars Technica", "SVT Nyheter", "Rock Paper Shotgun", "Zephyr Project", "Quanta Magazine", "embedded.fm", "arXiv cs.AI", "arXiv cs.LG", "Tom's Hardware", "TechPowerUp", "Phoronix", "Chips and Cheese", "ServeTheHome", "Hackaday", "PC Gamer", "Eurogamer", "Steam New Releases"],
+        },
+        "max_elapsed_ms": 1000,
+    },
+    {
+        "name": "command-news-health",
+        "kind": "json",
+        "url": "https://wesley.thesisko.com/command-news/health",
+        "expect_json": {"healthy": True},
+        "expect_fresh": {"field": "generatedAt", "max_age_seconds": 18000},
         "max_elapsed_ms": 1000,
     },
 ]

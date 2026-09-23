@@ -278,6 +278,25 @@ def check_json_object_keys(data: Any, rule: dict[str, Any]) -> str | None:
     return format_name_mismatch(expected, actual, f"JSON object {field}")
 
 
+def check_json_array_item_keys(data: Any, rule: dict[str, Any]) -> str | None:
+    """Validate the exact object contract for every item in a root JSON array."""
+    expected = rule.get("keys")
+    min_items = rule.get("min_items", 0)
+    if expected is None:
+        return None
+    if not isinstance(data, list):
+        return "JSON root is not an array"
+    if len(data) < min_items:
+        return f"JSON root has {len(data)} items, expected at least {min_items}"
+    for index, item in enumerate(data):
+        if not isinstance(item, dict):
+            return f"JSON root[{index}] is not an object"
+        detail = format_name_mismatch(expected, [str(key) for key in item], f"JSON root[{index}] object")
+        if detail:
+            return detail
+    return None
+
+
 def check_json_freshness(data: Any, freshness: dict[str, Any], now: datetime | None = None) -> str | None:
     """Validate that an ISO-8601 JSON timestamp is recent enough."""
     field = freshness.get("field")
@@ -401,6 +420,9 @@ def http_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
                 if detail:
                     return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
                 detail = check_json_object_keys(payload, spec.get("expect_object_keys", {}))
+                if detail:
+                    return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
+                detail = check_json_array_item_keys(payload, spec.get("expect_array_item_keys", {}))
                 if detail:
                     return ProbeResult(name, kind, "degraded", url, code, elapsed_ms, content_type, body_size, detail)
             detail = check_body_markers(body, spec.get("expect"), spec.get("expect_all"))

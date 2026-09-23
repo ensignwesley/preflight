@@ -8,7 +8,7 @@ from preflight.cli import build_record, format_status_counts, iter_records, late
 from preflight.coverage import coverage_gaps, derive_proxied_locations, parse_observatory_targets, run_coverage_probe
 from preflight.fleet import DEFAULT_FLEET
 from preflight.host import reboot_required
-from preflight.probes import ProbeResult, check_body_markers, check_content_type, check_headers, check_json_array_names, check_json_expectations, check_json_freshness, check_json_object_keys, check_latency_threshold, json_path, run_probe
+from preflight.probes import ProbeResult, check_body_markers, check_content_type, check_headers, check_json_array_item_keys, check_json_array_names, check_json_expectations, check_json_freshness, check_json_object_keys, check_latency_threshold, json_path, run_probe
 
 
 class PreflightTests(unittest.TestCase):
@@ -120,6 +120,17 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(by_name["promotion-review"]["url"], "https://wesley.thesisko.com/promotion-review/")
         self.assertEqual(by_name["promotion-review-status"]["expect_json"]["service"], "promotion-review")
 
+    def test_default_fleet_covers_command_news_contract_and_rosters(self):
+        by_name = {spec["name"]: spec for spec in DEFAULT_FLEET}
+        self.assertEqual(
+            by_name["command-news-feed"]["expect_array_item_keys"]["keys"],
+            ["title", "url", "source", "publishedAt", "fetchedAt"],
+        )
+        self.assertEqual(len(by_name["command-news-status"]["expect_object_keys"]["keys"]), 18)
+        self.assertEqual(by_name["command-news-health"]["expect_json"], {"healthy": True})
+        self.assertIn("Command News Feed", by_name["status-data"]["expect_array_names"]["names"])
+        self.assertIn("command-news", by_name["observatory-api"]["expect_object_keys"]["keys"])
+
     def test_websocket_probe_rejects_non_websocket_scheme(self):
         result = run_probe({"name": "bad-ws", "kind": "websocket", "url": "https://example.test/ws"})
         self.assertEqual(result.status, "fail")
@@ -171,6 +182,16 @@ class PreflightTests(unittest.TestCase):
         )
         self.assertEqual(check_json_object_keys({}, rule), "missing JSON object: services")
         self.assertEqual(check_json_object_keys({"services": []}, rule), "JSON field services is not an object")
+
+    def test_json_array_item_keys_enforces_exact_contract(self):
+        rule = {"keys": ["title", "url"], "min_items": 1}
+        self.assertIsNone(check_json_array_item_keys([{"title": "News", "url": "https://example.test"}], rule))
+        self.assertEqual(check_json_array_item_keys({}, rule), "JSON root is not an array")
+        self.assertEqual(check_json_array_item_keys([], rule), "JSON root has 0 items, expected at least 1")
+        self.assertEqual(
+            check_json_array_item_keys([{"title": "News", "extra": True}], rule),
+            "JSON root[0] object names mismatch (missing url; extra extra)",
+        )
 
     def test_latency_threshold_flags_slow_probe(self):
         self.assertIsNone(check_latency_threshold(999, 1000))
