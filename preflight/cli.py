@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .coverage import DEFAULT_NGINX_CONFIG, DEFAULT_OBSERVATORY_TARGETS, run_coverage_probe
 from .fleet import DEFAULT_FLEET
 from .host import capture_host
 from .probes import run_probe
@@ -21,9 +22,14 @@ def slug_time(ts: str) -> str:
     return ts.replace(":", "").replace("-", "").replace("Z", "Z")
 
 
-def build_record(timeout: float) -> dict[str, Any]:
+def build_record(
+    timeout: float,
+    nginx_config: Path = DEFAULT_NGINX_CONFIG,
+    observatory_targets: Path = DEFAULT_OBSERVATORY_TARGETS,
+) -> dict[str, Any]:
     checked_at = utc_now()
-    probes = [run_probe(spec, timeout=timeout).to_dict() for spec in DEFAULT_FLEET]
+    probes = [run_coverage_probe(nginx_config, observatory_targets).to_dict()]
+    probes.extend(run_probe(spec, timeout=timeout).to_dict() for spec in DEFAULT_FLEET)
     status = "pass"
     if any(p["status"] == "fail" for p in probes):
         status = "fail"
@@ -83,7 +89,11 @@ def iter_records(record_dir: Path) -> list[Path]:
 
 
 def cmd_record(args: argparse.Namespace) -> int:
-    record = build_record(timeout=args.timeout)
+    record = build_record(
+        timeout=args.timeout,
+        nginx_config=args.nginx_config,
+        observatory_targets=args.observatory_targets,
+    )
     path = write_record(record, args.record_dir)
     if args.json:
         print(json.dumps(record, indent=2, sort_keys=True))
@@ -139,11 +149,15 @@ def main(argv: list[str] | None = None) -> int:
     p_record = sub.add_parser("record", help="check fleet and write a timestamped evidence record")
     p_record.add_argument("--json", action="store_true", help="print JSON instead of compact report")
     p_record.add_argument("--timeout", type=float, default=None, help="per-probe timeout in seconds")
+    p_record.add_argument("--nginx-config", type=Path, default=DEFAULT_NGINX_CONFIG, help="nginx entry configuration")
+    p_record.add_argument("--observatory-targets", type=Path, default=DEFAULT_OBSERVATORY_TARGETS, help="Python source containing Observatory TARGETS")
     p_record.set_defaults(func=cmd_record)
 
     p_check = sub.add_parser("check", help="check fleet without changing the interface contract; currently aliases record")
     p_check.add_argument("--json", action="store_true", help="print JSON instead of compact report")
     p_check.add_argument("--timeout", type=float, default=None, help="per-probe timeout in seconds")
+    p_check.add_argument("--nginx-config", type=Path, default=DEFAULT_NGINX_CONFIG, help="nginx entry configuration")
+    p_check.add_argument("--observatory-targets", type=Path, default=DEFAULT_OBSERVATORY_TARGETS, help="Python source containing Observatory TARGETS")
     p_check.set_defaults(func=cmd_record)
 
     p_last = sub.add_parser("last", help="show the most recent record")

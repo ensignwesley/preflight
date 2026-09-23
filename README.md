@@ -4,7 +4,7 @@ A small read-only fleet health recorder for Wesley's services.
 
 ## Design
 
-`preflight record` is a black-box recorder snapshot, not a dashboard and not a daemon. It checks the public fleet, validates key health JSON fields and exact service rosters where they matter, verifies JSON response media types, checks required security headers, checks required human-visible page markers, verifies selected WebSocket upgrade paths and live protocol behavior, records response content type/byte size, flags probes that exceed conservative latency budgets, captures host context, writes durable JSON evidence, prints a compact operator report, and exits with an honest status code.
+`preflight record` is a black-box recorder snapshot, not a dashboard and not a daemon. It derives the proxied-service denominator from the live nginx include graph, fails if any public proxied backend lacks an Observatory target, checks the public fleet, validates key health JSON fields and exact service rosters where they matter, verifies JSON response media types, checks required security headers, checks required human-visible page markers, verifies selected WebSocket upgrade paths and live protocol behavior, records response content type/byte size, flags probes that exceed conservative latency budgets, captures host context, writes durable JSON evidence, prints a compact operator report, and exits with an honest status code.
 
 This is the v0 product because the operator problem is evidence: when something looks wrong, produce a record that says what was checked, what passed, what failed or degraded, and what the host looked like at that moment.
 
@@ -14,6 +14,7 @@ This is the v0 product because the operator problem is evidence: when something 
 preflight record
 preflight record --timeout 8
 preflight record --json
+preflight record --nginx-config /path/to/nginx.conf --observatory-targets /path/to/checker.py
 preflight last
 preflight list
 preflight list --limit 20
@@ -30,6 +31,7 @@ Records are written to:
 
 ## Current fleet probes
 
+- Observatory coverage: recursively read nginx `include` directives, derive public `location` blocks with a direct `proxy_pass`, and require each backend endpoint to appear in the literal `TARGETS` list in Observatory's `checker.py`. Static locations, named locations, and locations marked `internal` are excluded. Multiple paths to one backend (for example `/chat` and `/chat/ws`) are covered by one backend target.
 - Blog home
 - Projects
 - Status page

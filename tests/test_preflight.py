@@ -1,15 +1,90 @@
 import json
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
 from preflight.cli import build_record, format_status_counts, iter_records, latest_record, limited_records, slug_time, status_counts, write_record
+from preflight.coverage import coverage_gaps, derive_proxied_locations, parse_observatory_targets, run_coverage_probe
 from preflight.fleet import DEFAULT_FLEET
 from preflight.host import reboot_required
 from preflight.probes import ProbeResult, check_body_markers, check_content_type, check_headers, check_json_array_names, check_json_expectations, check_json_freshness, check_json_object_keys, check_latency_threshold, json_path, run_probe
 
 
 class PreflightTests(unittest.TestCase):
+    def test_nginx_include_graph_derives_only_public_proxied_locations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "conf.d").mkdir()
+            (root / "nginx.conf").write_text("http { include conf.d/*.conf; }\n", encoding="utf-8")
+            (root / "conf.d" / "site.conf").write_text(
+                """
+                server {
+                    location / { root /srv/www; }
+                    location /api { proxy_pass http://127.0.0.1:4100; }
+                    location /socket { proxy_pass http://127.0.0.1:4100/ws; }
+                    location @fallback { proxy_pass http://127.0.0.1:4998; }
+                    location /private { internal; proxy_pass http://127.0.0.1:4999; }
+                    # location /commented { proxy_pass http://127.0.0.1:4997; }
+                }
+                """,
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                derive_proxied_locations(root / "nginx.conf", include_root=root),
+                [
+                    {"location": "/api", "upstream": "http://127.0.0.1:4100"},
+                    {"location": "/socket", "upstream": "http://127.0.0.1:4100/ws"},
+                ],
+            )
+
+    def test_observatory_targets_are_parsed_without_executing_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "checker.py"
+            source.write_text(
+                "TARGETS = [{'slug': 'api', 'url': 'http://127.0.0.1:4100/health'}]\n"
+                "raise RuntimeError('must not execute')\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                parse_observatory_targets(source),
+                [{"slug": "api", "url": "http://127.0.0.1:4100/health"}],
+            )
+
+    def test_coverage_matches_backend_endpoint_and_reports_gaps(self):
+        locations = [
+            {"location": "/api", "upstream": "http://127.0.0.1:4100"},
+            {"location": "/socket", "upstream": "http://127.0.0.1:4100/ws"},
+            {"location": "/missing", "upstream": "http://127.0.0.1:4200"},
+        ]
+        targets = [{"slug": "api", "url": "http://127.0.0.1:4100/health"}]
+        self.assertEqual(
+            coverage_gaps(locations, targets),
+            [{"location": "/missing", "upstream": "http://127.0.0.1:4200"}],
+        )
+
+    def test_coverage_probe_turns_red_then_green_when_target_is_added(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            nginx = root / "nginx.conf"
+            checker = root / "checker.py"
+            nginx.write_text(
+                "server { location /throwaway { proxy_pass http://127.0.0.1:4321; } }\n",
+                encoding="utf-8",
+            )
+            checker.write_text("TARGETS = []\n", encoding="utf-8")
+            red = run_coverage_probe(nginx, checker, include_root=root)
+            self.assertEqual(red.status, "fail")
+            self.assertIn("/throwaway", red.detail)
+
+            checker.write_text(
+                "TARGETS = [{'slug': 'throwaway', 'url': 'http://127.0.0.1:4321/health'}]\n",
+                encoding="utf-8",
+            )
+            green = run_coverage_probe(nginx, checker, include_root=root)
+            self.assertEqual(green.status, "pass")
+            self.assertIn("1 proxied location(s) covered", green.detail)
+
     def test_slug_time_is_filename_safe(self):
         self.assertEqual(slug_time("2026-07-22T04:20:00Z"), "20260722T042000Z")
 
