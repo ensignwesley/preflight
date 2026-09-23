@@ -93,6 +93,8 @@ DEFAULT_FLEET = [
         "name": "forth-ws",
         "kind": "websocket",
         "url": "wss://wesley.thesisko.com/forth/ws",
+        "send_text": "2 3 + .",
+        "expect_text": "5  ok",
         "max_elapsed_ms": 1000,
     },
     {"name": "lisp", "kind": "http", "url": "https://wesley.thesisko.com/lisp/", "expect": "Lisp", "max_elapsed_ms": 2000},

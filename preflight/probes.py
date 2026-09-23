@@ -6,6 +6,7 @@ import base64
 import os
 import socket
 import ssl
+import struct
 import time
 import urllib.error
 import urllib.parse
@@ -40,12 +41,65 @@ def run_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
     return ProbeResult(name=spec.get("name", "unknown"), kind=kind, status="fail", detail=f"unsupported probe kind: {kind}")
 
 
-def websocket_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
-    """Validate that a public WebSocket endpoint performs an RFC 6455 upgrade.
+def websocket_client_text_frame(text: str) -> bytes:
+    """Build one masked RFC 6455 client text frame."""
+    payload = text.encode("utf-8")
+    mask = os.urandom(4)
+    length = len(payload)
+    if length < 126:
+        header = bytes((0x81, 0x80 | length))
+    elif length < 65536:
+        header = bytes((0x81, 0x80 | 126)) + struct.pack("!H", length)
+    else:
+        header = bytes((0x81, 0x80 | 127)) + struct.pack("!Q", length)
+    masked = bytes(value ^ mask[index % 4] for index, value in enumerate(payload))
+    return header + mask + masked
 
-    HTTP health routes can stay green while the reverse-proxied upgrade path is
-    broken. This probe keeps Preflight honest for browser apps whose real
-    behavior depends on WebSockets.
+
+def websocket_server_text(sock: socket.socket | ssl.SSLSocket, buffered: bytes = b"") -> tuple[str, bytes]:
+    """Read one unfragmented server text frame and preserve following bytes."""
+    data = buffered
+
+    def need(size: int) -> None:
+        nonlocal data
+        while len(data) < size:
+            chunk = sock.recv(4096)
+            if not chunk:
+                raise ConnectionError("websocket closed before response frame")
+            data += chunk
+
+    need(2)
+    first, second = data[0], data[1]
+    data = data[2:]
+    if not first & 0x80:
+        raise ValueError("fragmented websocket response is not supported")
+    opcode = first & 0x0F
+    if second & 0x80:
+        raise ValueError("server websocket frame must not be masked")
+    length = second & 0x7F
+    if length == 126:
+        need(2)
+        length = struct.unpack("!H", data[:2])[0]
+        data = data[2:]
+    elif length == 127:
+        need(8)
+        length = struct.unpack("!Q", data[:8])[0]
+        data = data[8:]
+    need(length)
+    payload, data = data[:length], data[length:]
+    if opcode == 0x8:
+        raise ConnectionError("websocket closed before expected response")
+    if opcode != 0x1:
+        raise ValueError(f"unexpected websocket opcode: {opcode}")
+    return payload.decode("utf-8", errors="replace"), data
+
+
+def websocket_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
+    """Validate an RFC 6455 upgrade and, when configured, live text behavior.
+
+    HTTP health routes can stay green while the reverse-proxied upgrade path or
+    application protocol is broken. Optional ``send_text`` and ``expect_text``
+    fields promote a handshake check into an end-to-end behavior probe.
     """
     name = spec["name"]
     url = spec["url"]
@@ -78,19 +132,45 @@ def websocket_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
         sock = ssl.create_default_context().wrap_socket(raw, server_hostname=host) if scheme == "wss" else raw
         sock.settimeout(timeout)
         sock.sendall(request.encode("ascii"))
-        response = sock.recv(4096).decode("latin1", errors="replace")
+        response_bytes = b""
+        while b"\r\n\r\n" not in response_bytes:
+            chunk = sock.recv(4096)
+            if not chunk:
+                break
+            response_bytes += chunk
+            if len(response_bytes) > 65536:
+                raise ValueError("websocket upgrade headers exceed 64 KiB")
+        header_bytes, separator, buffered = response_bytes.partition(b"\r\n\r\n")
+        response = header_bytes.decode("latin1", errors="replace")
         elapsed_ms = int((time.monotonic() - started) * 1000)
         status_line = response.split("\r\n", 1)[0]
-        header_block = response.split("\r\n\r\n", 1)[0]
-        lower_headers = header_block.lower()
+        lower_headers = response.lower()
         if not status_line.startswith("HTTP/1.1 101") and not status_line.startswith("HTTP/1.0 101"):
             return ProbeResult(name, "websocket", "fail", url, None, elapsed_ms, None, len(response), f"upgrade failed: {status_line or 'no response'}")
+        if not separator:
+            return ProbeResult(name, "websocket", "fail", url, None, elapsed_ms, None, len(response_bytes), "incomplete upgrade response")
         if "upgrade: websocket" not in lower_headers:
-            return ProbeResult(name, "websocket", "degraded", url, 101, elapsed_ms, None, len(response), "missing Upgrade: websocket header")
+            return ProbeResult(name, "websocket", "degraded", url, 101, elapsed_ms, None, len(response_bytes), "missing Upgrade: websocket header")
+        send_text = spec.get("send_text")
+        expect_text = spec.get("expect_text")
+        if send_text is not None:
+            sock.sendall(websocket_client_text_frame(str(send_text)))
+            matched = expect_text is None
+            observed: list[str] = []
+            for _ in range(5):
+                text, buffered = websocket_server_text(sock, buffered)
+                observed.append(text)
+                if expect_text is not None and str(expect_text) in text:
+                    matched = True
+                    break
+            if not matched:
+                summary = " | ".join(item.replace("\n", "\\n") for item in observed)
+                return ProbeResult(name, "websocket", "fail", url, 101, int((time.monotonic() - started) * 1000), None, len(response_bytes), f"missing websocket response marker {expect_text!r}; received {summary[:240]!r}")
+            elapsed_ms = int((time.monotonic() - started) * 1000)
         detail = check_latency_threshold(elapsed_ms, spec.get("max_elapsed_ms"))
         if detail:
-            return ProbeResult(name, "websocket", "degraded", url, 101, elapsed_ms, None, len(response), detail)
-        return ProbeResult(name, "websocket", "pass", url, 101, elapsed_ms, None, len(response))
+            return ProbeResult(name, "websocket", "degraded", url, 101, elapsed_ms, None, len(response_bytes), detail)
+        return ProbeResult(name, "websocket", "pass", url, 101, elapsed_ms, None, len(response_bytes))
     except Exception as exc:
         elapsed_ms = int((time.monotonic() - started) * 1000)
         return ProbeResult(name, "websocket", "fail", url, None, elapsed_ms, None, None, str(exc))

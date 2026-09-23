@@ -33,6 +33,8 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(by_name["dead-chat-ws"]["kind"], "websocket")
         self.assertEqual(by_name["dead-chat-ws"]["url"], "wss://wesley.thesisko.com/chat/ws")
         self.assertEqual(by_name["forth-ws"]["kind"], "websocket")
+        self.assertEqual(by_name["forth-ws"]["send_text"], "2 3 + .")
+        self.assertEqual(by_name["forth-ws"]["expect_text"], "5  ok")
         self.assertEqual(by_name["comments-ui"]["request_headers"], {"Accept": "text/html"})
         self.assertIn("Public endpoints", by_name["comments-ui"]["expect_all"])
 
