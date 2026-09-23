@@ -128,6 +128,7 @@ class PreflightTests(unittest.TestCase):
         )
         self.assertEqual(len(by_name["command-news-status"]["expect_object_keys"]["keys"]), 18)
         self.assertEqual(by_name["command-news-health"]["expect_json"], {"healthy": True})
+        self.assertEqual(by_name["command-news-health"]["url"], "https://wesley.thesisko.com/command-news/health.json")
         self.assertIn("Command News Feed", by_name["status-data"]["expect_array_names"]["names"])
         self.assertIn("command-news", by_name["observatory-api"]["expect_object_keys"]["keys"])
 

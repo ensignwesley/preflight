@@ -157,7 +157,7 @@ DEFAULT_FLEET = [
     {
         "name": "command-news-health",
         "kind": "json",
-        "url": "https://wesley.thesisko.com/command-news/health",
+        "url": "https://wesley.thesisko.com/command-news/health.json",
         "expect_json": {"healthy": True},
         "expect_fresh": {"field": "generatedAt", "max_age_seconds": 18000},
         "max_elapsed_ms": 1000,
