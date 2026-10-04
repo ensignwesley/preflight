@@ -5,86 +5,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from preflight.cli import build_record, format_status_counts, iter_records, latest_record, limited_records, slug_time, status_counts, write_record
-from preflight.coverage import coverage_gaps, derive_proxied_locations, parse_observatory_targets, run_coverage_probe
 from preflight.fleet import DEFAULT_FLEET
 from preflight.host import reboot_required
 from preflight.probes import ProbeResult, check_body_markers, check_content_type, check_headers, check_json_array_item_keys, check_json_array_names, check_json_expectations, check_json_freshness, check_json_object_keys, check_latency_threshold, json_path, run_probe
 
 
 class PreflightTests(unittest.TestCase):
-    def test_nginx_include_graph_derives_only_public_proxied_locations(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            (root / "conf.d").mkdir()
-            (root / "nginx.conf").write_text("http { include conf.d/*.conf; }\n", encoding="utf-8")
-            (root / "conf.d" / "site.conf").write_text(
-                """
-                server {
-                    location / { root /srv/www; }
-                    location /api { proxy_pass http://127.0.0.1:4100; }
-                    location /socket { proxy_pass http://127.0.0.1:4100/ws; }
-                    location @fallback { proxy_pass http://127.0.0.1:4998; }
-                    location /private { internal; proxy_pass http://127.0.0.1:4999; }
-                    # location /commented { proxy_pass http://127.0.0.1:4997; }
-                }
-                """,
-                encoding="utf-8",
-            )
-            self.assertEqual(
-                derive_proxied_locations(root / "nginx.conf", include_root=root),
-                [
-                    {"location": "/api", "upstream": "http://127.0.0.1:4100"},
-                    {"location": "/socket", "upstream": "http://127.0.0.1:4100/ws"},
-                ],
-            )
-
-    def test_observatory_targets_are_parsed_without_executing_source(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            source = Path(tmp) / "checker.py"
-            source.write_text(
-                "TARGETS = [{'slug': 'api', 'url': 'http://127.0.0.1:4100/health'}]\n"
-                "raise RuntimeError('must not execute')\n",
-                encoding="utf-8",
-            )
-            self.assertEqual(
-                parse_observatory_targets(source),
-                [{"slug": "api", "url": "http://127.0.0.1:4100/health"}],
-            )
-
-    def test_coverage_matches_backend_endpoint_and_reports_gaps(self):
-        locations = [
-            {"location": "/api", "upstream": "http://127.0.0.1:4100"},
-            {"location": "/socket", "upstream": "http://127.0.0.1:4100/ws"},
-            {"location": "/missing", "upstream": "http://127.0.0.1:4200"},
-        ]
-        targets = [{"slug": "api", "url": "http://127.0.0.1:4100/health"}]
-        self.assertEqual(
-            coverage_gaps(locations, targets),
-            [{"location": "/missing", "upstream": "http://127.0.0.1:4200"}],
-        )
-
-    def test_coverage_probe_turns_red_then_green_when_target_is_added(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            nginx = root / "nginx.conf"
-            checker = root / "checker.py"
-            nginx.write_text(
-                "server { location /throwaway { proxy_pass http://127.0.0.1:4321; } }\n",
-                encoding="utf-8",
-            )
-            checker.write_text("TARGETS = []\n", encoding="utf-8")
-            red = run_coverage_probe(nginx, checker, include_root=root)
-            self.assertEqual(red.status, "fail")
-            self.assertIn("/throwaway", red.detail)
-
-            checker.write_text(
-                "TARGETS = [{'slug': 'throwaway', 'url': 'http://127.0.0.1:4321/health'}]\n",
-                encoding="utf-8",
-            )
-            green = run_coverage_probe(nginx, checker, include_root=root)
-            self.assertEqual(green.status, "pass")
-            self.assertIn("1 proxied location(s) covered", green.detail)
-
     def test_slug_time_is_filename_safe(self):
         self.assertEqual(slug_time("2026-07-22T04:20:00Z"), "20260722T042000Z")
 
@@ -98,20 +24,8 @@ class PreflightTests(unittest.TestCase):
         result = ProbeResult(name="x", kind="http", status="pass", url="https://example.test", http_status=200, elapsed_ms=12)
         self.assertEqual(result.to_dict()["status"], "pass")
 
-    def test_default_fleet_includes_public_app_surfaces(self):
-        by_name = {spec["name"]: spec for spec in DEFAULT_FLEET}
-        for name in ["dead-drop-ui", "dead-chat-ui", "comments-ui", "promotion-review"]:
-            self.assertIn(name, by_name)
-            self.assertEqual(by_name[name]["kind"], "http")
-        self.assertIn("Secret Message", by_name["dead-drop-ui"]["expect_all"])
-        self.assertIn("Callsign", by_name["dead-chat-ui"]["expect_all"])
-        self.assertEqual(by_name["dead-chat-ws"]["kind"], "websocket")
-        self.assertEqual(by_name["dead-chat-ws"]["url"], "wss://wesley.thesisko.com/chat/ws")
-        self.assertEqual(by_name["forth-ws"]["kind"], "websocket")
-        self.assertEqual(by_name["forth-ws"]["send_text"], "2 3 + .")
-        self.assertEqual(by_name["forth-ws"]["expect_text"], "5  ok")
-        self.assertEqual(by_name["comments-ui"]["request_headers"], {"Accept": "text/html"})
-        self.assertIn("Public endpoints", by_name["comments-ui"]["expect_all"])
+    def test_default_fleet_is_surviving_public_operations(self):
+        self.assertEqual([spec["name"] for spec in DEFAULT_FLEET], ["blog", "projects", "promotion-review", "promotion-review-status"])
 
     def test_default_fleet_includes_promotion_review_surface_and_status_api(self):
         by_name = {spec["name"]: spec for spec in DEFAULT_FLEET}
@@ -119,12 +33,6 @@ class PreflightTests(unittest.TestCase):
         self.assertIn("promotion-review-status", by_name)
         self.assertEqual(by_name["promotion-review"]["url"], "https://wesley.thesisko.com/promotion-review/")
         self.assertEqual(by_name["promotion-review-status"]["expect_json"]["service"], "promotion-review")
-
-    def test_default_fleet_excludes_retired_command_news(self):
-        by_name = {spec["name"]: spec for spec in DEFAULT_FLEET}
-        self.assertFalse(any(name.startswith("command-news") for name in by_name))
-        self.assertNotIn("Command News Feed", by_name["status-data"]["expect_array_names"]["names"])
-        self.assertNotIn("command-news", by_name["observatory-api"]["expect_object_keys"]["keys"])
 
     def test_websocket_probe_rejects_non_websocket_scheme(self):
         result = run_probe({"name": "bad-ws", "kind": "websocket", "url": "https://example.test/ws"})
