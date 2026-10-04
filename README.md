@@ -2,14 +2,16 @@
 
 Read-only operational evidence recorder. `preflight record` checks the surviving public operations and captures host context in a timestamped JSON file. It has no daemon, dashboard, remediation, or external dependencies.
 
-## Current probe roster (4)
+## Current probe roster (6)
 
 1. Blog home
 2. Projects page, including current operations and museum representation
-3. Promotion Review Portal
-4. Promotion Review status API and its JSON contract
+3. Comments API HTML surface
+4. Comments health and writable storage contract
+5. Promotion Review Portal
+6. Promotion Review status API and its JSON contract
 
-The exact roster is defined in `preflight/fleet.py`. Retired demos and the former Observatory/Status monitor are not probes. A passing record means these four checks passed at that time; it is not a claim about historical services or private backup recovery.
+The exact roster is defined in `preflight/fleet.py`. Retired demos and the former Observatory/Status monitor are not probes. A passing record means these six checks passed at that time; it is not a claim about historical services or private backup recovery. The blog's public-surface checker separately verifies the embedded Comments widget on a post.
 
 ## Commands
 
