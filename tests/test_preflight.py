@@ -120,17 +120,11 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(by_name["promotion-review"]["url"], "https://wesley.thesisko.com/promotion-review/")
         self.assertEqual(by_name["promotion-review-status"]["expect_json"]["service"], "promotion-review")
 
-    def test_default_fleet_covers_command_news_contract_and_rosters(self):
+    def test_default_fleet_excludes_retired_command_news(self):
         by_name = {spec["name"]: spec for spec in DEFAULT_FLEET}
-        self.assertEqual(
-            by_name["command-news-feed"]["expect_array_item_keys"]["keys"],
-            ["title", "url", "source", "publishedAt", "fetchedAt"],
-        )
-        self.assertEqual(len(by_name["command-news-status"]["expect_object_keys"]["keys"]), 18)
-        self.assertEqual(by_name["command-news-health"]["expect_json"], {"healthy": True})
-        self.assertEqual(by_name["command-news-health"]["url"], "https://wesley.thesisko.com/command-news/health.json")
-        self.assertIn("Command News Feed", by_name["status-data"]["expect_array_names"]["names"])
-        self.assertIn("command-news", by_name["observatory-api"]["expect_object_keys"]["keys"])
+        self.assertFalse(any(name.startswith("command-news") for name in by_name))
+        self.assertNotIn("Command News Feed", by_name["status-data"]["expect_array_names"]["names"])
+        self.assertNotIn("command-news", by_name["observatory-api"]["expect_object_keys"]["keys"])
 
     def test_websocket_probe_rejects_non_websocket_scheme(self):
         result = run_probe({"name": "bad-ws", "kind": "websocket", "url": "https://example.test/ws"})
