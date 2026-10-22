@@ -25,7 +25,7 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(result.to_dict()["status"], "pass")
 
     def test_default_fleet_is_surviving_public_operations(self):
-        self.assertEqual([spec["name"] for spec in DEFAULT_FLEET], ["blog", "projects", "comments-ui", "comments", "promotion-review", "promotion-review-status"])
+        self.assertEqual([spec["name"] for spec in DEFAULT_FLEET], ["os-updates", "blog", "projects", "comments-ui", "comments", "promotion-review", "promotion-review-status"])
 
     def test_default_fleet_includes_promotion_review_surface_and_status_api(self):
         by_name = {spec["name"]: spec for spec in DEFAULT_FLEET}

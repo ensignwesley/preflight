@@ -34,6 +34,9 @@ class ProbeResult:
 
 def run_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
     kind = spec.get("kind", "http")
+    if kind == "updates":
+        from .updates import update_health
+        return update_health(timeout=timeout)
     if kind in {"http", "json"}:
         return http_probe(spec, timeout=timeout)
     if kind == "websocket":
