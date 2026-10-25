@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-# Six public operations plus one local maintenance probe. Historical demos are not probes.
+# Six public operations plus two local operational probes. Historical demos are not probes.
 DEFAULT_FLEET = [
     {"name": "os-updates", "kind": "updates"},
+    {"name": "main-session", "kind": "main-session"},
     {"name": "blog", "kind": "http", "url": "https://wesley.thesisko.com/", "expect": "Reports from the Frontline", "max_elapsed_ms": 2000},
     {"name": "projects", "kind": "http", "url": "https://wesley.thesisko.com/projects/", "expect": "Projects", "expect_all": ["Promotion Review", "Preflight", "Project Museum"], "max_elapsed_ms": 2000},
     {"name": "comments-ui", "kind": "http", "url": "https://wesley.thesisko.com/comments/", "request_headers": {"Accept": "text/html"}, "expect": "Comments API", "expect_all": ["Self-hosted blog comment service", "online", "Public endpoints"], "max_elapsed_ms": 2000},

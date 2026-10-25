@@ -34,6 +34,9 @@ class ProbeResult:
 
 def run_probe(spec: dict[str, Any], timeout: float = 5.0) -> ProbeResult:
     kind = spec.get("kind", "http")
+    if kind == "main-session":
+        from .main_session import main_session_health
+        return main_session_health(timeout=timeout)
     if kind == "updates":
         from .updates import update_health
         return update_health(timeout=timeout)

@@ -1,0 +1,11 @@
+[Unit]
+Description=Check main-session health independently every 15 minutes
+
+[Timer]
+OnStartupSec=2min
+OnUnitActiveSec=15min
+AccuracySec=30s
+Unit=preflight-main-watchdog.service
+
+[Install]
+WantedBy=timers.target
