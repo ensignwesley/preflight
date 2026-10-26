@@ -39,7 +39,7 @@ def main_session_health(timeout: float = 5, *, root: Path = ROOT,
     try:
         nodes = _read(root / 'agents/main/agent/openclaw-agent.sqlite', '''
             SELECT n.current_session_id, n.entry_json, n.entry_valid,
-                   n.archived_at, w.session_id AS window_id, w.ended_at
+                   n.archived_at, w.session_id AS window_id
             FROM session_nodes n LEFT JOIN session_windows w
               ON w.session_id = n.current_session_id AND w.session_key = n.session_key
             WHERE n.session_key = ?''', (MAIN_KEY,), timeout)
@@ -54,8 +54,9 @@ def main_session_health(timeout: float = 5, *, root: Path = ROOT,
             return result('fail', 'main session tombstoned during restart recovery; use Resume or /reset through OpenClaw, then verify a successful heartbeat')
         if node['entry_valid'] != 1 or entry.get('sessionId') != node['current_session_id'] or not node['window_id']:
             return result('fail', 'main session entry/window invalid; inspect main lifecycle through OpenClaw')
-        if node['archived_at'] is not None or 'archivedAt' in entry or node['ended_at'] is not None:
-            return result('fail', 'main session archived/ended; inspect/reset main through OpenClaw')
+        # A window closes after each run on 10.5; ended_at is not session death.
+        if node['archived_at'] is not None or 'archivedAt' in entry:
+            return result('fail', 'main session archived; inspect/reset main through OpenClaw')
         if entry.get('initializationPending') or entry.get('providerReview') or 'pendingProjectGitUrl' in entry or 'pendingWorktree' in entry:
             return result('fail', 'main session admission blocked; inspect pending initialization/provider review/workspace in OpenClaw')
         state_db = root / 'state/openclaw.sqlite'

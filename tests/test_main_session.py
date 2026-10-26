@@ -81,19 +81,34 @@ class MainSessionTests(unittest.TestCase):
             c.execute("UPDATE cron_run_receipts SET status='interrupted'")
         self.assertEqual(self.health().status, 'fail')
 
-    def test_missing_invalid_or_ended_main_fails(self):
-        statements = ('UPDATE session_nodes SET entry_valid=0', 'UPDATE session_nodes SET current_session_id="missing"', 'UPDATE session_windows SET ended_at=1')
+    def test_missing_invalid_or_archived_main_fails(self):
+        statements = ('UPDATE session_nodes SET entry_valid=0', 'UPDATE session_nodes SET current_session_id="missing"', 'UPDATE session_nodes SET archived_at=1')
         for statement in statements:
             with self.subTest(statement=statement):
                 with sqlite3.connect(self.agent) as c:
                     c.execute(statement)
                 self.assertEqual(self.health().status, 'fail')
                 with sqlite3.connect(self.agent) as c:
-                    c.execute('UPDATE session_nodes SET entry_valid=1, current_session_id="live"')
+                    c.execute('UPDATE session_nodes SET entry_valid=1, current_session_id="live", archived_at=NULL')
                     c.execute('UPDATE session_windows SET ended_at=NULL')
         with sqlite3.connect(self.agent) as c:
             c.execute('DELETE FROM session_nodes')
         self.assertEqual(self.health().status, 'fail')
+
+    def test_ended_window_with_fresh_success_passes(self):
+        with sqlite3.connect(self.agent) as c:
+            c.execute('UPDATE session_windows SET ended_at=?', (NOW - 30000,))
+        self.assertEqual(self.health().status, 'pass')
+        with sqlite3.connect(self.agent) as c:
+            c.execute('UPDATE session_nodes SET archived_at=?', (NOW - 10000,))
+        self.assertEqual(self.health().status, 'fail')
+        self.assertIn('archived', self.health().detail)
+
+    def test_entry_archived_at_fails(self):
+        self.entry['archivedAt'] = NOW - 10000
+        self.entry_update()
+        self.assertEqual(self.health().status, 'fail')
+        self.assertIn('archived', self.health().detail)
 
     def test_missing_db_is_failure_and_not_created(self):
         self.agent.unlink()
